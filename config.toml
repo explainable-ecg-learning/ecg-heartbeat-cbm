@@ -1,0 +1,19 @@
+# config.toml — user-specific path configuration
+# Edit the values below to match your environment.
+# This file is read by cbm_inference.ipynb.
+
+[paths]
+# Root of this repository
+repo_root    = "/nfs/data8/schlegel/git/ecg-heartbeat-cbm"
+
+# Training run to load (relative to repo_root, or absolute)
+run_dir      = "runs/20260423_064742"
+
+# Base directory that holds the raw data
+data_dir     = "/nfs/data8/schlegel/git/ecg-cbm/data"
+
+# PTB-XL folder, relative to data_dir (or absolute to override)
+data_path    = "ptb-xl"
+
+# Concept labels file, relative to data_dir (or absolute to override)
+concept_file = "concepts.parquet"

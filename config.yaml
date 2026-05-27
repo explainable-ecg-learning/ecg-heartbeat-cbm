@@ -1,0 +1,58 @@
+# config.yaml — Unified configuration for the ECG heartbeat CBM
+# Run: python train.py [--config config.yaml] [--run-dir runs/my_run]
+
+data:
+  data_dir: "/nfs/data8/schlegel/git/ecg-cbm/data"   # <-- only path you need to change
+  data_path: "ptb-xl"              # relative to data_dir (or absolute to override)
+  concept_file: "concepts.parquet" # relative to data_dir (or absolute to override)
+  sampling_rate: 500            # 500 or 100 Hz
+  t_fixed: 500                  # samples per beat subsequence (1 s at 500 Hz)
+  lead: 0                       # lead index for delineation (1 = Lead II)
+  val_fold: 9
+  test_fold: 10
+  batch_size: 256
+  num_workers: 4
+  beat_window_pre: 250          # samples before R-peak  (= t_fixed // 2, symmetric)
+  beat_window_post: 250         # samples after R-peak   (= t_fixed // 2, symmetric)
+  neg_oversample_factor: 1.0    # >1 increases negatives per strategy
+  use_sliding_window: false     # true → dense sliding-window negatives
+  stride: 50                    # stride for sliding window mode
+  # model_lead: null            # set to int for single-lead input  (e.g. 1)
+  # model_leads: null           # set to list for multi-lead subset (e.g. [0, 1, 6])
+
+model:
+  encoder:
+    in_channels: 12             # overridden by model_lead / model_leads
+    base_channels: 64           # latent_dim = base_channels * 8 = 512
+    dropout: 0.2
+  concept_layer:
+    num_concepts: 10            # [P, Q, R, S, T, U, PR, QRS, ST, QT]
+  mc_dropout_rate: 0.1          # dropout on z for epistemic uncertainty
+
+training:
+  epochs: 100
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  min_lr: 1.0e-5                # cosine annealing lower bound
+  lambda_concept_start: 1.0
+  lambda_concept_end: 0.3
+  lambda_concept_anneal_epochs: 50
+  lambda_consist: 0.1
+  use_heteroscedastic_loss: true
+  n_mc_samples: 10
+  reliable_concepts: [2, 4, 7, 9]   # R=2, T=4, QRS=7, QT=9
+  label_smooth_reliable: 0.02
+  label_smooth_noisy: 0.10
+  early_stopping_patience: 15
+  checkpoint_dir: "checkpoints"
+  log_dir: "runs"
+
+augmentation:
+  temporal_jitter: 10
+  amplitude_scale_min: 0.8
+  amplitude_scale_max: 1.2
+  noise_std: 0.01
+  lead_dropout_prob: 0.1
+  lead_dropout_max: 2
+
+concept_names: ["P", "Q", "R", "S", "T", "U", "PR", "QRS", "ST", "QT"]

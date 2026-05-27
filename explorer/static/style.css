@@ -1,0 +1,222 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  background: #0f1117;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+header {
+  padding: 1.25rem 2rem 1rem;
+  border-bottom: 1px solid #1e2535;
+  background: #131820;
+}
+header h1 { font-size: 1.4rem; font-weight: 700; color: #7dd3fc; }
+.subtitle  { font-size: 0.82rem; color: #64748b; margin-top: 0.2rem; }
+
+main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: #161c27;
+  border: 1px solid #1e2a3a;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+.controls { padding: 1rem 1.5rem; }
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.control-row:last-child { margin-bottom: 0; }
+
+label { font-size: 0.82rem; color: #94a3b8; white-space: nowrap; }
+
+select, input[type="number"] {
+  background: #0f1520;
+  border: 1px solid #2d3a4f;
+  border-radius: 6px;
+  color: #e2e8f0;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+select:hover, input:hover   { border-color: #4a90d9; }
+select:focus, input:focus   { border-color: #7dd3fc; }
+
+select#record-select { min-width: 200px; }
+
+.primary-btn, .secondary-btn {
+  padding: 0.38rem 1rem;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, background 0.15s;
+}
+.primary-btn   { background: #2563eb; color: #fff; }
+.primary-btn:hover   { background: #1d4ed8; }
+.secondary-btn { background: #1e3a5f; color: #7dd3fc; border: 1px solid #2d5a8a; }
+.secondary-btn:hover { background: #254870; }
+
+.status-label { font-size: 0.78rem; color: #64748b; }
+.status-label.running { color: #facc15; }
+.status-label.done    { color: #4ade80; }
+
+.hint { font-size: 0.84rem; color: #475569; font-style: italic; }
+
+/* ── Signal chart ────────────────────────────────────────────────────────── */
+#signal-container { overflow: hidden; }
+.ecg-line   { fill: none; stroke: #38bdf8; stroke-width: 1.2; }
+.window-rect {
+  fill: rgba(250, 204, 21, 0.08);
+  stroke: #facc15;
+  stroke-width: 1.5;
+  cursor: ew-resize;
+}
+.window-handle {
+  fill: #facc15;
+  opacity: 0.7;
+  cursor: ew-resize;
+}
+.axis path, .axis line { stroke: #2d3a4f; }
+.axis text { fill: #64748b; font-size: 10px; }
+.grid line { stroke: #1e2a3a; stroke-width: 0.5; }
+.grid path { stroke-width: 0; }
+
+/* ── Histogram ───────────────────────────────────────────────────────────── */
+#histogram-container { display: flex; justify-content: center; }
+
+.hist-bar-bg {
+  fill: #1e2a3a;
+  rx: 3;
+}
+.hist-bar-fill {
+  rx: 3;
+  transition: height 0.18s ease, y 0.18s ease;
+}
+.hist-error-bar { stroke-width: 2; }
+.hist-label      { font-size: 11px; fill: #94a3b8; text-anchor: middle; }
+.hist-value      { font-size: 10px; fill: #cbd5e1; text-anchor: middle; }
+.hist-axis-label { font-size: 10px; fill: #64748b; }
+.uncert-band     { fill: #f59e0b; opacity: 0.22; }   /* amber uncertainty band */
+
+/* ── Pipeline layout ─────────────────────────────────────────────────────── */
+.pipeline {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.pipe-panel {
+  background: #0f1520;
+  border: 1px solid #1e2a3a;
+  border-radius: 8px;
+  padding: 0.7rem 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.pipe-panel--input    { width: 226px; }
+.pipe-panel--concepts { flex: 1; min-width: 420px; }
+.pipe-panel--task     { width: 186px; }
+
+.pipe-panel-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.45rem;
+}
+
+/* ── Connector (Encoder / Predictor) ─────────────────────────────────────── */
+.pipe-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 86px;
+  padding: 0 0.3rem;
+  gap: 0.25rem;
+}
+
+.pipe-sym {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+}
+
+.pipe-arrow-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.pipe-arrow-line {
+  flex: 1;
+  height: 1px;
+  background: #2d3a4f;
+}
+.pipe-arrow-tip {
+  color: #4a6080;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.pipe-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  text-align: center;
+}
+
+#heatmap-container { overflow-x: auto; }
+.heatmap-label  { font-size: 10px; fill: #64748b; text-anchor: end; }
+.heatmap-cursor { stroke: #facc15; stroke-width: 1.5; opacity: 0.8; pointer-events: none; }
+
+/* ── Meta / labels ───────────────────────────────────────────────────────── */
+.meta-label {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #475569;
+}
+.window-info {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #475569;
+}
+.task-prob-label {
+  margin-left: auto;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: #1e2a3a;
+}

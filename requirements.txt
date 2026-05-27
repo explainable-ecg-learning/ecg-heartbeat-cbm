@@ -1,0 +1,14 @@
+# PyTorch — CUDA 12.1 wheel (driver 525+ required; system has 535 → cu121/cu124 OK)
+# cu130 (torch 2.11+) requires driver ≥550 — pin to 2.5.1 which has a cu121 build
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.5.1+cu121
+numpy
+scipy
+pandas
+wfdb
+neurokit2
+scikit-learn
+matplotlib
+PyYAML
+tqdm
+pyarrow
