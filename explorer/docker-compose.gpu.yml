@@ -1,0 +1,14 @@
+# GPU override — run from explorer/:
+#   cd explorer && docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+services:
+  explorer:
+    build:
+      args:
+        TORCH_INDEX_URL: "https://download.pytorch.org/whl/cu121"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

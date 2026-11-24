@@ -1,0 +1,3329 @@
+{
+  "window_models": {
+    "cbm_v2": {
+      "task/accuracy": 0.996567370289998,
+      "task/f1": 0.9972010423704276,
+      "task/precision": 0.9963355834136933,
+      "task/recall": 0.9980680061823802,
+      "task/auroc": 0.9992537574659021,
+      "task/brier": 0.002957648131996393,
+      "task/ece": 0.009341139154704194,
+      "concept/P/f1": 0.9949500974193805,
+      "concept/P/accuracy": 0.9899509416046843,
+      "concept/P/auroc": 0.8974227876319234,
+      "concept/Q/f1": 0.9879981599966545,
+      "concept/Q/accuracy": 0.9771687681476473,
+      "concept/Q/auroc": 0.9818582900035934,
+      "concept/R/f1": 0.9930590399732396,
+      "concept/R/accuracy": 0.9869007693825212,
+      "concept/R/auroc": 0.9958080163841251,
+      "concept/S/f1": 0.989152860907401,
+      "concept/S/accuracy": 0.9790400252624931,
+      "concept/S/auroc": 0.9745921033961026,
+      "concept/T/f1": 0.9906675070654495,
+      "concept/T/accuracy": 0.9815455130266967,
+      "concept/T/auroc": 0.915265604135615,
+      "concept/U/f1": 0.8866664788573683,
+      "concept/U/accuracy": 0.8381737731295253,
+      "concept/U/auroc": 0.8829103640033282,
+      "concept/PR/f1": 0.9931607230092818,
+      "concept/PR/accuracy": 0.9865626874625075,
+      "concept/PR/auroc": 0.9771625611539613,
+      "concept/QRS/f1": 0.9555492419350673,
+      "concept/QRS/accuracy": 0.9274360163595733,
+      "concept/QRS/auroc": 0.9903781013602113,
+      "concept/ST/f1": 0.9293508370468505,
+      "concept/ST/accuracy": 0.8786612609630978,
+      "concept/ST/auroc": 0.9708020935811801,
+      "concept/QT/f1": 0.998068598068598,
+      "concept/QT/accuracy": 0.9976237299246149,
+      "concept/QT/auroc": 0.9997600745412869,
+      "concept/macro_f1": 0.9718623544279291,
+      "concept/macro_accuracy": 0.954306348526336,
+      "uncertainty/task_std_mean": 0.004713825415819883,
+      "uncertainty/task_epistemic_mean": 0.0034627169370651245,
+      "uncertainty/task_aleatoric_mean": 0.0031408825889229774,
+      "uncertainty/error_detection_auroc": 0.8989392639521326,
+      "uncertainty/concept_aleatoric_reliable": 0.00037181490915827453,
+      "uncertainty/concept_aleatoric_noisy": 0.0012640149798244238,
+      "uncertainty/noisy_vs_reliable_ratio": 3.399581212829625,
+      "faithfulness/flip_rate_to_incomplete": 0.9395049823207972,
+      "faithfulness/flip_rate_to_complete": 0.9617977528089887,
+      "faithfulness/counterfactual_flip_rate": 0.9506513675648929,
+      "faithfulness/mean_prob_shift": 0.8880027234554291,
+      "leakage/ois": 0.1252234610791506
+    },
+    "cbm_randint_v2": {
+      "task/accuracy": 0.9968041033734465,
+      "task/f1": 0.9973934030571199,
+      "task/precision": 0.9967839454557149,
+      "task/recall": 0.9980036063884595,
+      "task/auroc": 0.9993949587864934,
+      "task/brier": 0.002868346869945526,
+      "task/ece": 0.007592614721110481,
+      "concept/P/f1": 0.9949698789192198,
+      "concept/P/accuracy": 0.9899905048267131,
+      "concept/P/auroc": 0.9076297897220523,
+      "concept/Q/f1": 0.992113270819102,
+      "concept/Q/accuracy": 0.9848454715405115,
+      "concept/Q/auroc": 0.9894086907950912,
+      "concept/R/f1": 0.9949655982547407,
+      "concept/R/accuracy": 0.9905306766620635,
+      "concept/R/auroc": 0.9967209712914974,
+      "concept/S/f1": 0.9863052435969945,
+      "concept/S/accuracy": 0.9732375463803584,
+      "concept/S/auroc": 0.9335623832202721,
+      "concept/T/f1": 0.9911101165652908,
+      "concept/T/accuracy": 0.9824300418140881,
+      "concept/T/auroc": 0.9027437577046644,
+      "concept/U/f1": 0.912679526302528,
+      "concept/U/accuracy": 0.8745374094931617,
+      "concept/U/auroc": 0.9315375659773523,
+      "concept/PR/f1": 0.977018659352533,
+      "concept/PR/accuracy": 0.9557688462307539,
+      "concept/PR/auroc": 0.9590612020821655,
+      "concept/QRS/f1": 0.9542761029887437,
+      "concept/QRS/accuracy": 0.9254964793186322,
+      "concept/QRS/auroc": 0.9902224286241336,
+      "concept/ST/f1": 0.9419652409595587,
+      "concept/ST/accuracy": 0.8990153897070992,
+      "concept/ST/auroc": 0.9718293809006024,
+      "concept/QT/f1": 0.9981698998436096,
+      "concept/QT/accuracy": 0.9977466404457555,
+      "concept/QT/auroc": 0.999661831342445,
+      "concept/macro_f1": 0.9743573537602321,
+      "concept/macro_accuracy": 0.9573599006419137,
+      "uncertainty/task_std_mean": 0.0037660624366253614,
+      "uncertainty/task_epistemic_mean": 0.0027127033099532127,
+      "uncertainty/task_aleatoric_mean": 0.002572916215285659,
+      "uncertainty/error_detection_auroc": 0.9341647904273217,
+      "uncertainty/concept_aleatoric_reliable": 0.00036236565210856497,
+      "uncertainty/concept_aleatoric_noisy": 0.0012301726965233684,
+      "uncertainty/noisy_vs_reliable_ratio": 3.3948380299433234,
+      "faithfulness/flip_rate_to_incomplete": 0.9391522480221265,
+      "faithfulness/flip_rate_to_complete": 0.9529495815472545,
+      "faithfulness/counterfactual_flip_rate": 0.9460509147846905,
+      "faithfulness/mean_prob_shift": 0.8645811975002289,
+      "leakage/ois": 0.09851054651403604
+    },
+    "cem_v2": {
+      "task/accuracy": 0.9960149930952851,
+      "task/f1": 0.9967483339235698,
+      "task/precision": 0.9965879096117942,
+      "task/recall": 0.9969088098918083,
+      "task/auroc": 0.9998608519681422,
+      "task/brier": 0.0032586627639830112,
+      "task/ece": 0.0025180734988433594,
+      "concept/P/f1": 0.9949500974193805,
+      "concept/P/accuracy": 0.9899509416046843,
+      "concept/P/auroc": 0.9802109576643421,
+      "concept/Q/f1": 0.9918672267864164,
+      "concept/Q/accuracy": 0.9843681635575355,
+      "concept/Q/auroc": 0.9923543387043449,
+      "concept/R/f1": 0.9943381982888777,
+      "concept/R/accuracy": 0.9893470112448215,
+      "concept/R/auroc": 0.9972941510056951,
+      "concept/S/f1": 0.9884166751191804,
+      "concept/S/accuracy": 0.9774611194442252,
+      "concept/S/auroc": 0.978336935261014,
+      "concept/T/f1": 0.9923116141531559,
+      "concept/T/accuracy": 0.9848423930524285,
+      "concept/T/auroc": 0.9520811494966399,
+      "concept/U/f1": 0.9138670678032202,
+      "concept/U/accuracy": 0.8756234915526951,
+      "concept/U/auroc": 0.9347304770399505,
+      "concept/PR/f1": 0.9916161801603329,
+      "concept/PR/accuracy": 0.9835632873425315,
+      "concept/PR/auroc": 0.981612762114137,
+      "concept/QRS/f1": 0.9820815105904451,
+      "concept/QRS/accuracy": 0.9694312096808196,
+      "concept/QRS/auroc": 0.9941725274907043,
+      "concept/ST/f1": 0.9799991010831948,
+      "concept/ST/accuracy": 0.9631805394671521,
+      "concept/ST/auroc": 0.9761448463038713,
+      "concept/QT/f1": 0.9977711985629221,
+      "concept/QT/accuracy": 0.997254998361193,
+      "concept/QT/auroc": 0.9998457328235906,
+      "concept/macro_f1": 0.9827218869967126,
+      "concept/macro_accuracy": 0.9715023155308085,
+      "uncertainty/task_std_mean": 0.00271995784714818,
+      "uncertainty/task_epistemic_mean": 0.0018676255131140351,
+      "uncertainty/task_aleatoric_mean": 0.0019244273426011205,
+      "uncertainty/error_detection_auroc": 0.9831882411819061,
+      "uncertainty/concept_aleatoric_reliable": 0.00030318385688588023,
+      "uncertainty/concept_aleatoric_noisy": 0.0010612477781251073,
+      "uncertainty/noisy_vs_reliable_ratio": 3.5003439464937136,
+      "faithfulness/flip_rate_to_incomplete": 1.0,
+      "faithfulness/flip_rate_to_complete": 0.24021606196494089,
+      "faithfulness/counterfactual_flip_rate": 0.6201080309824705,
+      "faithfulness/mean_prob_shift": 0.6208018064498901,
+      "leakage/ois": 0.29184087604614006
+    },
+    "cbm_softseg": {
+      "task/accuracy": 0.9494139542250732,
+      "task/f1": 0.966355460159861,
+      "task/precision": 0.9599466303892842,
+      "task/recall": 0.9728504387941777,
+      "task/auroc": 0.9845557984037279,
+      "task/brier": 0.03738256171345711,
+      "task/ece": 0.0069798109227101925,
+      "concept/P/f1": 0.9948284353964866,
+      "concept/P/accuracy": 0.9898552766651235,
+      "concept/P/auroc": 0.9772395592432183,
+      "concept/Q/f1": 0.9946717644187749,
+      "concept/Q/accuracy": 0.9895417531534408,
+      "concept/Q/auroc": 0.9928442105068395,
+      "concept/R/f1": 0.9966157172153919,
+      "concept/R/accuracy": 0.9933673873445791,
+      "concept/R/auroc": 0.9937114440559334,
+      "concept/S/f1": 0.995644687531652,
+      "concept/S/accuracy": 0.9914592726478241,
+      "concept/S/auroc": 0.9906846344316472,
+      "concept/T/f1": 0.9913254149941998,
+      "concept/T/accuracy": 0.9830763068295614,
+      "concept/T/auroc": 0.9781002808837033,
+      "concept/PR/f1": 0.9855619207302874,
+      "concept/PR/accuracy": 0.9731427333766515,
+      "concept/PR/auroc": 0.9840133800141128,
+      "concept/QRS/f1": 0.9935876151739023,
+      "concept/QRS/accuracy": 0.9877480620923456,
+      "concept/QRS/auroc": 0.9927027419928903,
+      "concept/ST/f1": 0.9728369417592074,
+      "concept/ST/accuracy": 0.9540457740133358,
+      "concept/ST/auroc": 0.9764665568039995,
+      "concept/QT/f1": 0.9710190842573735,
+      "concept/QT/accuracy": 0.9562504270195177,
+      "concept/QT/auroc": 0.986608076451673,
+      "concept/macro_f1": 0.9884546201641418,
+      "concept/macro_accuracy": 0.979831888126931,
+      "uncertainty/task_std_mean": 0.017735153436660767,
+      "uncertainty/task_epistemic_mean": 0.010472389869391918,
+      "uncertainty/task_aleatoric_mean": 0.013993418775498867,
+      "uncertainty/error_detection_auroc": 0.9061100031581533,
+      "uncertainty/concept_aleatoric_reliable": 0.000325037311995402,
+      "uncertainty/concept_aleatoric_noisy": 0.0017023414839059114,
+      "uncertainty/noisy_vs_reliable_ratio": 5.237372514113066,
+      "faithfulness/flip_rate_to_incomplete": 0.8830316031812474,
+      "faithfulness/flip_rate_to_complete": 0.9190817323347443,
+      "faithfulness/counterfactual_flip_rate": 0.9010566677579959,
+      "faithfulness/mean_prob_shift": 0.758690357208252,
+      "leakage/ois": 0.12618055078123067
+    },
+    "cem_softseg": {
+      "task/accuracy": 0.9499485230062564,
+      "task/f1": 0.9665988425864757,
+      "task/precision": 0.9633911875477363,
+      "task/recall": 0.9698279290505607,
+      "task/auroc": 0.9876727347599235,
+      "task/brier": 0.03659774735569954,
+      "task/ece": 0.00812595684736345,
+      "concept/P/f1": 0.9951411525924103,
+      "concept/P/accuracy": 0.9904591292445805,
+      "concept/P/auroc": 0.9870190781110002,
+      "concept/Q/f1": 0.9968430485966842,
+      "concept/Q/accuracy": 0.9938128692319974,
+      "concept/Q/auroc": 0.986823755398033,
+      "concept/R/f1": 0.9966471419915168,
+      "concept/R/accuracy": 0.9934267838758216,
+      "concept/R/auroc": 0.9941990825054117,
+      "concept/S/f1": 0.9963129532839026,
+      "concept/S/accuracy": 0.9927701749855999,
+      "concept/S/auroc": 0.9864679171773378,
+      "concept/T/f1": 0.9914719374403498,
+      "concept/T/accuracy": 0.9833566993791308,
+      "concept/T/auroc": 0.9740493977205208,
+      "concept/PR/f1": 0.9869137097244072,
+      "concept/PR/accuracy": 0.9756768464370803,
+      "concept/PR/auroc": 0.9861755346577646,
+      "concept/QRS/f1": 0.9935337893240059,
+      "concept/QRS/accuracy": 0.9876489363811185,
+      "concept/QRS/auroc": 0.9948451950207717,
+      "concept/ST/f1": 0.9819742947042824,
+      "concept/ST/accuracy": 0.9695440619931519,
+      "concept/ST/auroc": 0.9950243899309055,
+      "concept/QT/f1": 0.9813732485236744,
+      "concept/QT/accuracy": 0.97205584276572,
+      "concept/QT/auroc": 0.9966456560175859,
+      "concept/macro_f1": 0.9911345862423594,
+      "concept/macro_accuracy": 0.9843057049215778,
+      "uncertainty/task_std_mean": 0.028608273714780807,
+      "uncertainty/task_epistemic_mean": 0.014331723563373089,
+      "uncertainty/task_aleatoric_mean": 0.02446652762591839,
+      "uncertainty/error_detection_auroc": 0.9254605023503748,
+      "uncertainty/concept_aleatoric_reliable": 0.000349305453710258,
+      "uncertainty/concept_aleatoric_noisy": 0.007319777272641659,
+      "uncertainty/noisy_vs_reliable_ratio": 20.955233291929275,
+      "faithfulness/flip_rate_to_incomplete": 1.0,
+      "faithfulness/flip_rate_to_complete": 0.9597256559534253,
+      "faithfulness/counterfactual_flip_rate": 0.9798628279767126,
+      "faithfulness/mean_prob_shift": 0.9243597686290741,
+      "leakage/ois": 0.2577808700924282
+    },
+    "cbm_softseg_masked": {
+      "task/accuracy": 0.9483844143502019,
+      "task/f1": 0.9655837040753014,
+      "task/precision": 0.9615849810685738,
+      "task/recall": 0.9696158231036403,
+      "task/auroc": 0.9820241712768208,
+      "task/brier": 0.039617083966732025,
+      "task/ece": 0.013988608323599522,
+      "concept/P/f1": 0.9943671780586223,
+      "concept/P/accuracy": 0.9889293693766229,
+      "concept/P/auroc": 0.9850253034651769,
+      "concept/Q/f1": 0.9941533526868187,
+      "concept/Q/accuracy": 0.9885039118633243,
+      "concept/Q/auroc": 0.9894966701361314,
+      "concept/R/f1": 0.99684829383599,
+      "concept/R/accuracy": 0.9938227607507721,
+      "concept/R/auroc": 0.9940346213234077,
+      "concept/S/f1": 0.9951452382878874,
+      "concept/S/accuracy": 0.9904661648161758,
+      "concept/S/auroc": 0.9881405290393497,
+      "concept/T/f1": 0.9916348090598923,
+      "concept/T/accuracy": 0.983697176046465,
+      "concept/T/auroc": 0.9839853953978284,
+      "concept/PR/f1": 0.9871939780235146,
+      "concept/PR/accuracy": 0.976196664500758,
+      "concept/PR/auroc": 0.9876042141616457,
+      "concept/QRS/f1": 0.9940951430472389,
+      "concept/QRS/accuracy": 0.9887393192046153,
+      "concept/QRS/auroc": 0.9931117916644013,
+      "concept/ST/f1": 0.9655360008704403,
+      "concept/ST/accuracy": 0.9429176428185259,
+      "concept/ST/auroc": 0.9798836305979725,
+      "concept/QT/f1": 0.977050193050193,
+      "concept/QT/accuracy": 0.9661572798287367,
+      "concept/QT/auroc": 0.9941130755176751,
+      "concept/macro_f1": 0.9884471318800663,
+      "concept/macro_accuracy": 0.9799366988006663,
+      "uncertainty/task_std_mean": 0.016183562576770782,
+      "uncertainty/task_epistemic_mean": 0.011388636194169521,
+      "uncertainty/task_aleatoric_mean": 0.011259930208325386,
+      "uncertainty/error_detection_auroc": 0.9033804813378522,
+      "uncertainty/concept_aleatoric_reliable": 0.00034918301389552653,
+      "uncertainty/concept_aleatoric_noisy": 0.000826094183139503,
+      "uncertainty/noisy_vs_reliable_ratio": 2.3657914339059616,
+      "faithfulness/flip_rate_to_incomplete": 0.862142406394615,
+      "faithfulness/flip_rate_to_complete": 0.8970022443090734,
+      "faithfulness/counterfactual_flip_rate": 0.8795723253518442,
+      "faithfulness/mean_prob_shift": 0.7693220674991608,
+      "leakage/ois": 0.08894359541603454
+    },
+    "blackbox_softseg": {
+      "task/accuracy": 0.9468005068504,
+      "task/f1": 0.9644346203226959,
+      "task/precision": 0.9629433842575461,
+      "task/recall": 0.9659304822758968,
+      "task/auroc": 0.9826511013856456,
+      "task/brier": 0.03999100998044014,
+      "task/ece": 0.00551339512243983,
+      "uncertainty/task_std_mean": 0.011505662463605404,
+      "uncertainty/task_epistemic_mean": 0.011505662463605404,
+      "uncertainty/task_aleatoric_mean": 0.0,
+      "uncertainty/error_detection_auroc": 0.8977869994792094,
+      "faithfulness/flip_rate_to_incomplete": 0.0,
+      "faithfulness/flip_rate_to_complete": 0.0,
+      "faithfulness/counterfactual_flip_rate": 0.0,
+      "faithfulness/mean_prob_shift": 0.0
+    }
+  },
+  "dense_models": {
+    "dense_blackbox_s42": {
+      "pathology/NORM/auroc": 0.9443485901429826,
+      "pathology/MI/auroc": 0.9238057149161519,
+      "pathology/STTC/auroc": 0.9324249665947169,
+      "pathology/CD/auroc": 0.9218151794852356,
+      "pathology/HYP/auroc": 0.8479926345340988,
+      "pathology/macro_auroc": 0.9140774171346372,
+      "pathology/macro_auroc_ci95_lo": 0.9065189791737489,
+      "pathology/macro_auroc_ci95_hi": 0.9215945556194979,
+      "pathology/macro_auroc_boot_std": 0.003932647433936976,
+      "pathology/NORM/auroc_ci95_lo": 0.9360084548317688,
+      "pathology/NORM/auroc_ci95_hi": 0.9527283643259785,
+      "pathology/MI/auroc_ci95_lo": 0.9109624773807546,
+      "pathology/MI/auroc_ci95_hi": 0.9358920424499607,
+      "pathology/STTC/auroc_ci95_lo": 0.9218393807130255,
+      "pathology/STTC/auroc_ci95_hi": 0.9433791121921082,
+      "pathology/CD/auroc_ci95_lo": 0.9065575200741008,
+      "pathology/CD/auroc_ci95_hi": 0.9351945793094768,
+      "pathology/HYP/auroc_ci95_lo": 0.8231475271291662,
+      "pathology/HYP/auroc_ci95_hi": 0.8710472975812228,
+      "pathology/macro_ece": 0.03557627774198259,
+      "pathology/macro_brier": 0.08709453215444281,
+      "pathology/mc_macro_auroc": 0.9138759269243764,
+      "pathology/mc_ece": 0.033162602915927125,
+      "pathology/mc_brier": 0.08686080410395938,
+      "uncertainty/task_error_detection_auroc": 0.8156679901526065,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8179905036115453,
+      "uncertainty/task_mean_std": 0.01887032948434353
+    },
+    "dense_blackbox_s43": {
+      "pathology/NORM/auroc": 0.9449829942697626,
+      "pathology/MI/auroc": 0.9260971977052074,
+      "pathology/STTC/auroc": 0.9334014287182649,
+      "pathology/CD/auroc": 0.9216653320571623,
+      "pathology/HYP/auroc": 0.8375654532837045,
+      "pathology/macro_auroc": 0.9127424812068202,
+      "pathology/macro_auroc_ci95_lo": 0.9048376551873584,
+      "pathology/macro_auroc_ci95_hi": 0.9209132512065348,
+      "pathology/macro_auroc_boot_std": 0.004156111565864737,
+      "pathology/NORM/auroc_ci95_lo": 0.936911173006759,
+      "pathology/NORM/auroc_ci95_hi": 0.9531798556301544,
+      "pathology/MI/auroc_ci95_lo": 0.9128362153089755,
+      "pathology/MI/auroc_ci95_hi": 0.9377505925029699,
+      "pathology/STTC/auroc_ci95_lo": 0.9229599264248792,
+      "pathology/STTC/auroc_ci95_hi": 0.9441805174660494,
+      "pathology/CD/auroc_ci95_lo": 0.9061081804298539,
+      "pathology/CD/auroc_ci95_hi": 0.9356018928335416,
+      "pathology/HYP/auroc_ci95_lo": 0.8112966791039163,
+      "pathology/HYP/auroc_ci95_hi": 0.8609065501588427,
+      "pathology/macro_ece": 0.04302226616509326,
+      "pathology/macro_brier": 0.08800987359343433,
+      "pathology/mc_macro_auroc": 0.9127919220276498,
+      "pathology/mc_ece": 0.04117827745611595,
+      "pathology/mc_brier": 0.08780111638719411,
+      "uncertainty/task_error_detection_auroc": 0.813556625222011,
+      "uncertainty/task_error_detection_auroc_pooled": 0.816186566506643,
+      "uncertainty/task_mean_std": 0.018418125808238983
+    },
+    "dense_blackbox_s44": {
+      "pathology/NORM/auroc": 0.945175543699892,
+      "pathology/MI/auroc": 0.9207722859664608,
+      "pathology/STTC/auroc": 0.9321528186583691,
+      "pathology/CD/auroc": 0.9242044463818657,
+      "pathology/HYP/auroc": 0.8380060800580406,
+      "pathology/macro_auroc": 0.9120622349529256,
+      "pathology/macro_auroc_ci95_lo": 0.9050399731504596,
+      "pathology/macro_auroc_ci95_hi": 0.9194326304123471,
+      "pathology/macro_auroc_boot_std": 0.003920103506987116,
+      "pathology/NORM/auroc_ci95_lo": 0.937350309490606,
+      "pathology/NORM/auroc_ci95_hi": 0.9533482047031114,
+      "pathology/MI/auroc_ci95_lo": 0.9081495969407835,
+      "pathology/MI/auroc_ci95_hi": 0.9335075400753141,
+      "pathology/STTC/auroc_ci95_lo": 0.9210421905458113,
+      "pathology/STTC/auroc_ci95_hi": 0.9434709331387224,
+      "pathology/CD/auroc_ci95_lo": 0.9087230591667391,
+      "pathology/CD/auroc_ci95_hi": 0.9378145943142525,
+      "pathology/HYP/auroc_ci95_lo": 0.8128675355571963,
+      "pathology/HYP/auroc_ci95_hi": 0.8612319851580472,
+      "pathology/macro_ece": 0.03826055217944509,
+      "pathology/macro_brier": 0.0878902316019906,
+      "pathology/mc_macro_auroc": 0.9120563982766136,
+      "pathology/mc_ece": 0.03734100516483785,
+      "pathology/mc_brier": 0.08756660666559142,
+      "uncertainty/task_error_detection_auroc": 0.8116134413552516,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8131345907681122,
+      "uncertainty/task_mean_std": 0.018222643062472343
+    },
+    "dense_cbm_detached_norandint": {
+      "seg/argmax_acc": 0.9701574158325751,
+      "seg/mean_kl": 0.022293065092800095,
+      "seg/mean_mae": 0.013414523276553791,
+      "seg/P/soft_dice": 0.7442534237209247,
+      "seg/P/hard_dice": 0.9590519347346175,
+      "seg/P/mae": 0.021008455063018936,
+      "seg/PQ/soft_dice": 0.378740546742966,
+      "seg/PQ/hard_dice": 0.8307801188412371,
+      "seg/PQ/mae": 0.006205235634856705,
+      "seg/QRS/soft_dice": 0.855218861217483,
+      "seg/QRS/hard_dice": 0.9840058782980449,
+      "seg/QRS/mae": 0.006362298446530315,
+      "seg/ST/soft_dice": 0.6157497568094558,
+      "seg/ST/hard_dice": 0.9588899080938047,
+      "seg/ST/mae": 0.008620309678720711,
+      "seg/T/soft_dice": 0.7734552056895663,
+      "seg/T/hard_dice": 0.9762456106212121,
+      "seg/T/mae": 0.017866282330305603,
+      "seg/TP/soft_dice": 0.7912091270981342,
+      "seg/TP/hard_dice": 0.9757934074150932,
+      "seg/TP/mae": 0.020424558505890474,
+      "seg/macro_soft_dice": 0.693104486879755,
+      "seg/macro_hard_dice": 0.9474611430006682,
+      "pathology/NORM/auroc": 0.9164427964231211,
+      "pathology/MI/auroc": 0.8482893865842894,
+      "pathology/STTC/auroc": 0.9158157663592446,
+      "pathology/CD/auroc": 0.8630299742238732,
+      "pathology/HYP/auroc": 0.7824673916472147,
+      "pathology/macro_auroc": 0.8652090630475486,
+      "pathology/macro_auroc_ci95_lo": 0.8556842415982339,
+      "pathology/macro_auroc_ci95_hi": 0.875642569593332,
+      "pathology/macro_auroc_boot_std": 0.004963075985626383,
+      "pathology/NORM/auroc_ci95_lo": 0.9058382095798561,
+      "pathology/NORM/auroc_ci95_hi": 0.9273193631717533,
+      "pathology/MI/auroc_ci95_lo": 0.8288514558702412,
+      "pathology/MI/auroc_ci95_hi": 0.8652189853699129,
+      "pathology/STTC/auroc_ci95_lo": 0.9027342035786583,
+      "pathology/STTC/auroc_ci95_hi": 0.9297226765334479,
+      "pathology/CD/auroc_ci95_lo": 0.8441581175612942,
+      "pathology/CD/auroc_ci95_hi": 0.8827999104267628,
+      "pathology/HYP/auroc_ci95_lo": 0.753466931563302,
+      "pathology/HYP/auroc_ci95_hi": 0.8118347161890377,
+      "pathology/intervened_macro_auroc": 0.8610667254159481,
+      "pathology/intervention_gain": -0.004142337631600546,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.792035502966025,
+      "leakage/bottleneck_probe_auroc": 0.792035502966025,
+      "leakage/soft_mask_excess_auroc": -0.002176032698491981,
+      "leakage/bottleneck_excess_auroc": -0.002176032698491981,
+      "uncertainty/seg_error_detection_auroc": 0.8458126849682567,
+      "uncertainty/mean_per_timestamp_std": 0.011178760789334774,
+      "uncertainty/boundary_std": 0.018160104130705196,
+      "uncertainty/interior_std": 0.010236311393479506,
+      "uncertainty/boundary_vs_interior": 1.774086722515409,
+      "counterfactual/ablate_P_task_shift": 0.14826050897439322,
+      "counterfactual/ablate_PQ_task_shift": 0.08543300131956737,
+      "counterfactual/ablate_QRS_task_shift": 0.1342019165555636,
+      "counterfactual/ablate_ST_task_shift": 0.20950033267339072,
+      "counterfactual/ablate_T_task_shift": 0.2125269522269567,
+      "pathology/macro_ece": 0.03609991354025199,
+      "pathology/macro_brier": 0.10809316604743714,
+      "pathology/mc_macro_auroc": 0.8666512877582232,
+      "pathology/mc_ece": 0.021495215933760622,
+      "pathology/mc_brier": 0.10613238859187947,
+      "uncertainty/task_error_detection_auroc": 0.7720412118316007,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7746698193592365,
+      "uncertainty/task_mean_std": 0.027503274381160736
+    },
+    "dense_cbm_detached_s42": {
+      "seg/argmax_acc": 0.9702911737943585,
+      "seg/mean_kl": 0.02221340378682325,
+      "seg/mean_mae": 0.013375779254602092,
+      "seg/P/soft_dice": 0.7442001717806045,
+      "seg/P/hard_dice": 0.9592150030020611,
+      "seg/P/mae": 0.020983993127630232,
+      "seg/PQ/soft_dice": 0.37860144606732193,
+      "seg/PQ/hard_dice": 0.8316589215928059,
+      "seg/PQ/mae": 0.006200983201947616,
+      "seg/QRS/soft_dice": 0.8551318284780579,
+      "seg/QRS/hard_dice": 0.9841138529929379,
+      "seg/QRS/mae": 0.006362720770657984,
+      "seg/ST/soft_dice": 0.6154461939019181,
+      "seg/ST/hard_dice": 0.9590451578148632,
+      "seg/ST/mae": 0.008564433902258,
+      "seg/T/soft_dice": 0.7733596787526644,
+      "seg/T/hard_dice": 0.9763665310454835,
+      "seg/T/mae": 0.01776325087681806,
+      "seg/TP/soft_dice": 0.7910605137556803,
+      "seg/TP/hard_dice": 0.9758829640558022,
+      "seg/TP/mae": 0.020379293648300656,
+      "seg/macro_soft_dice": 0.6929666387893745,
+      "seg/macro_hard_dice": 0.9477137384173254,
+      "pathology/NORM/auroc": 0.9169834483164536,
+      "pathology/MI/auroc": 0.8468777581641659,
+      "pathology/STTC/auroc": 0.9144515226268233,
+      "pathology/CD/auroc": 0.8651236922406278,
+      "pathology/HYP/auroc": 0.7824890779761529,
+      "pathology/macro_auroc": 0.8651850998648447,
+      "pathology/macro_auroc_ci95_lo": 0.8553891830355845,
+      "pathology/macro_auroc_ci95_hi": 0.8755593521806796,
+      "pathology/macro_auroc_boot_std": 0.004964746302487354,
+      "pathology/NORM/auroc_ci95_lo": 0.9065995090397307,
+      "pathology/NORM/auroc_ci95_hi": 0.9274604609284421,
+      "pathology/MI/auroc_ci95_lo": 0.8277125040702272,
+      "pathology/MI/auroc_ci95_hi": 0.8640686564676912,
+      "pathology/STTC/auroc_ci95_lo": 0.901121763244767,
+      "pathology/STTC/auroc_ci95_hi": 0.9283414990103386,
+      "pathology/CD/auroc_ci95_lo": 0.8459423518589724,
+      "pathology/CD/auroc_ci95_hi": 0.8837730636722089,
+      "pathology/HYP/auroc_ci95_lo": 0.7534257382046033,
+      "pathology/HYP/auroc_ci95_hi": 0.8128627807460346,
+      "pathology/intervened_macro_auroc": 0.865925510917409,
+      "pathology/intervention_gain": 0.0007404110525642826,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.7918074905523966,
+      "leakage/bottleneck_probe_auroc": 0.7918074905523966,
+      "leakage/soft_mask_excess_auroc": -0.0024040451121203343,
+      "leakage/bottleneck_excess_auroc": -0.0024040451121203343,
+      "uncertainty/seg_error_detection_auroc": 0.8456920172687833,
+      "uncertainty/mean_per_timestamp_std": 0.011179418303072453,
+      "uncertainty/boundary_std": 0.018207654356956482,
+      "uncertainty/interior_std": 0.010231654780606428,
+      "uncertainty/boundary_vs_interior": 1.7795415059808457,
+      "counterfactual/ablate_P_task_shift": 0.19093844294548035,
+      "counterfactual/ablate_PQ_task_shift": 0.10811373839775722,
+      "counterfactual/ablate_QRS_task_shift": 0.19688105583190918,
+      "counterfactual/ablate_ST_task_shift": 0.20162440339724222,
+      "counterfactual/ablate_T_task_shift": 0.18069863319396973,
+      "pathology/macro_ece": 0.044230657824639814,
+      "pathology/macro_brier": 0.1093396097693144,
+      "pathology/mc_macro_auroc": 0.8666003440494361,
+      "pathology/mc_ece": 0.027619192741572773,
+      "pathology/mc_brier": 0.10640795034823097,
+      "uncertainty/task_error_detection_auroc": 0.7754235769732873,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7797091460856798,
+      "uncertainty/task_mean_std": 0.02636692300438881
+    },
+    "dense_cbm_detached_s43": {
+      "seg/argmax_acc": 0.9702179253867151,
+      "seg/mean_kl": 0.02195613486903488,
+      "seg/mean_mae": 0.013337801121349295,
+      "seg/P/soft_dice": 0.7437620244329575,
+      "seg/P/hard_dice": 0.9593442391598836,
+      "seg/P/mae": 0.020964929471350018,
+      "seg/PQ/soft_dice": 0.3785607030630898,
+      "seg/PQ/hard_dice": 0.8339060370899654,
+      "seg/PQ/mae": 0.006201983548165236,
+      "seg/QRS/soft_dice": 0.8547989448146697,
+      "seg/QRS/hard_dice": 0.9838166411496554,
+      "seg/QRS/mae": 0.006357398014919014,
+      "seg/ST/soft_dice": 0.6153277577319488,
+      "seg/ST/hard_dice": 0.9589421628882969,
+      "seg/ST/mae": 0.008527858119752865,
+      "seg/T/soft_dice": 0.7724879898037977,
+      "seg/T/hard_dice": 0.9762305890218907,
+      "seg/T/mae": 0.01767096101380783,
+      "seg/TP/soft_dice": 0.7902102765931424,
+      "seg/TP/hard_dice": 0.9757114134343222,
+      "seg/TP/mae": 0.020303676560100802,
+      "seg/macro_soft_dice": 0.6925246160732677,
+      "seg/macro_hard_dice": 0.9479918471240024,
+      "pathology/NORM/auroc": 0.9162557123698295,
+      "pathology/MI/auroc": 0.8466168358340689,
+      "pathology/STTC/auroc": 0.9150104187106963,
+      "pathology/CD/auroc": 0.8636832616276865,
+      "pathology/HYP/auroc": 0.7895854362500789,
+      "pathology/macro_auroc": 0.866230332958472,
+      "pathology/macro_auroc_ci95_lo": 0.8570227069016362,
+      "pathology/macro_auroc_ci95_hi": 0.8765219880698717,
+      "pathology/macro_auroc_boot_std": 0.00486006610372256,
+      "pathology/NORM/auroc_ci95_lo": 0.9059383602292275,
+      "pathology/NORM/auroc_ci95_hi": 0.9272887726983887,
+      "pathology/MI/auroc_ci95_lo": 0.8280590113451056,
+      "pathology/MI/auroc_ci95_hi": 0.8642839006474509,
+      "pathology/STTC/auroc_ci95_lo": 0.9019545698066335,
+      "pathology/STTC/auroc_ci95_hi": 0.9293329859519719,
+      "pathology/CD/auroc_ci95_lo": 0.8454740546929973,
+      "pathology/CD/auroc_ci95_hi": 0.8830339287883424,
+      "pathology/HYP/auroc_ci95_lo": 0.7619323637579368,
+      "pathology/HYP/auroc_ci95_hi": 0.8196518098021583,
+      "pathology/intervened_macro_auroc": 0.868506087349578,
+      "pathology/intervention_gain": 0.002275754391106055,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.7921961284068194,
+      "leakage/bottleneck_probe_auroc": 0.7921961284068194,
+      "leakage/soft_mask_excess_auroc": -0.0020154072576975546,
+      "leakage/bottleneck_excess_auroc": -0.0020154072576975546,
+      "uncertainty/seg_error_detection_auroc": 0.8481514578286504,
+      "uncertainty/mean_per_timestamp_std": 0.011194617487490177,
+      "uncertainty/boundary_std": 0.018257314960161846,
+      "uncertainty/interior_std": 0.010247822540501753,
+      "uncertainty/boundary_vs_interior": 1.7815799295903822,
+      "counterfactual/ablate_P_task_shift": 0.17856809993584952,
+      "counterfactual/ablate_PQ_task_shift": 0.07751131057739258,
+      "counterfactual/ablate_QRS_task_shift": 0.22544768949349722,
+      "counterfactual/ablate_ST_task_shift": 0.1995562563339869,
+      "counterfactual/ablate_T_task_shift": 0.18433310091495514,
+      "pathology/macro_ece": 0.04795793770492187,
+      "pathology/macro_brier": 0.11024126431721602,
+      "pathology/mc_macro_auroc": 0.8673547199610299,
+      "pathology/mc_ece": 0.02810893419992731,
+      "pathology/mc_brier": 0.10702799722813185,
+      "uncertainty/task_error_detection_auroc": 0.7787259063022531,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7831494481149388,
+      "uncertainty/task_mean_std": 0.026109185069799423
+    },
+    "dense_cbm_detached_s44": {
+      "seg/argmax_acc": 0.9698070973612375,
+      "seg/mean_kl": 0.022588363328123223,
+      "seg/mean_mae": 0.013586640656193279,
+      "seg/P/soft_dice": 0.743794301375862,
+      "seg/P/hard_dice": 0.9579989494437964,
+      "seg/P/mae": 0.021316341438328168,
+      "seg/PQ/soft_dice": 0.38097075240910194,
+      "seg/PQ/hard_dice": 0.8217694994205215,
+      "seg/PQ/mae": 0.0064403418002072195,
+      "seg/QRS/soft_dice": 0.8552174498245986,
+      "seg/QRS/hard_dice": 0.983671452776969,
+      "seg/QRS/mae": 0.006516951022091728,
+      "seg/ST/soft_dice": 0.6153349815213806,
+      "seg/ST/hard_dice": 0.9598500879586981,
+      "seg/ST/mae": 0.008610937318116345,
+      "seg/T/soft_dice": 0.7738043191001236,
+      "seg/T/hard_dice": 0.9763837990634341,
+      "seg/T/mae": 0.01799914667408937,
+      "seg/TP/soft_dice": 0.7916617376094338,
+      "seg/TP/hard_dice": 0.9756118281629588,
+      "seg/TP/mae": 0.02063612568432684,
+      "seg/macro_soft_dice": 0.6934639236400834,
+      "seg/macro_hard_dice": 0.9458809361377295,
+      "pathology/NORM/auroc": 0.9176813348972721,
+      "pathology/MI/auroc": 0.8473499558693733,
+      "pathology/STTC/auroc": 0.915199637447556,
+      "pathology/CD/auroc": 0.8600389484856525,
+      "pathology/HYP/auroc": 0.7896327518768532,
+      "pathology/macro_auroc": 0.8659805257153413,
+      "pathology/macro_auroc_ci95_lo": 0.8565543089079221,
+      "pathology/macro_auroc_ci95_hi": 0.87638897890918,
+      "pathology/macro_auroc_boot_std": 0.004874418102593937,
+      "pathology/NORM/auroc_ci95_lo": 0.9069257112993832,
+      "pathology/NORM/auroc_ci95_hi": 0.928715267459772,
+      "pathology/MI/auroc_ci95_lo": 0.8284457761566726,
+      "pathology/MI/auroc_ci95_hi": 0.8651260066468563,
+      "pathology/STTC/auroc_ci95_lo": 0.9022847782394471,
+      "pathology/STTC/auroc_ci95_hi": 0.9286433133667853,
+      "pathology/CD/auroc_ci95_lo": 0.8412369164162604,
+      "pathology/CD/auroc_ci95_hi": 0.8791313260386459,
+      "pathology/HYP/auroc_ci95_lo": 0.7599473867525892,
+      "pathology/HYP/auroc_ci95_hi": 0.8194564970905631,
+      "pathology/intervened_macro_auroc": 0.8662380628507043,
+      "pathology/intervention_gain": 0.00025753713536291745,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.791970586741082,
+      "leakage/bottleneck_probe_auroc": 0.791970586741082,
+      "leakage/soft_mask_excess_auroc": -0.00224094892343496,
+      "leakage/bottleneck_excess_auroc": -0.00224094892343496,
+      "uncertainty/seg_error_detection_auroc": 0.8530552300761035,
+      "uncertainty/mean_per_timestamp_std": 0.011188368313014507,
+      "uncertainty/boundary_std": 0.018311789880196255,
+      "uncertainty/interior_std": 0.010223165775338808,
+      "uncertainty/boundary_vs_interior": 1.7912054135294877,
+      "counterfactual/ablate_P_task_shift": 0.16660811503728232,
+      "counterfactual/ablate_PQ_task_shift": 0.10120087116956711,
+      "counterfactual/ablate_QRS_task_shift": 0.31348464886347455,
+      "counterfactual/ablate_ST_task_shift": 0.20124850670496622,
+      "counterfactual/ablate_T_task_shift": 0.20127636194229126,
+      "pathology/macro_ece": 0.0382174581994275,
+      "pathology/macro_brier": 0.1085776419469473,
+      "pathology/mc_macro_auroc": 0.8673997630990691,
+      "pathology/mc_ece": 0.02356112380162661,
+      "pathology/mc_brier": 0.1062733637075004,
+      "uncertainty/task_error_detection_auroc": 0.7721839513832107,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7754602145612189,
+      "uncertainty/task_mean_std": 0.0280276108533144
+    },
+    "dense_cbm_fiducial24": {
+      "seg/argmax_acc": 0.9437565969062784,
+      "seg/mean_kl": 0.03428580325597844,
+      "seg/mean_mae": 0.005222585384868151,
+      "seg/P-Onset/soft_dice": 0.09834793057544383,
+      "seg/P-Onset/hard_dice": 0.46254071705004823,
+      "seg/P-Onset/mae": 0.003470273487344452,
+      "seg/(p/soft_dice": 0.5312682850844594,
+      "seg/(p/hard_dice": 0.9266876280312356,
+      "seg/(p/mae": 0.015677098268156598,
+      "seg/P-Peak/soft_dice": 0.20382168055886943,
+      "seg/P-Peak/hard_dice": 0.7731239943550088,
+      "seg/P-Peak/mae": 0.003487311147146598,
+      "seg/p)/soft_dice": 0.5621065107187112,
+      "seg/p)/hard_dice": 0.9424183617826136,
+      "seg/p)/mae": 0.008669417564385148,
+      "seg/P-Offset/soft_dice": 0.18516125354066054,
+      "seg/P-Offset/hard_dice": 0.7580929958928732,
+      "seg/P-Offset/mae": 0.0024111926362555716,
+      "seg/pq/soft_dice": 0.34741931781267615,
+      "seg/pq/hard_dice": 0.895492178540423,
+      "seg/pq/mae": 0.004690025385126838,
+      "seg/QRS-Onset/soft_dice": 0.23383943139888716,
+      "seg/QRS-Onset/hard_dice": 0.7931064295860657,
+      "seg/QRS-Onset/mae": 0.002206199826491324,
+      "seg/(q/soft_dice": 0.3694809261505837,
+      "seg/(q/hard_dice": 0.9081511790683379,
+      "seg/(q/mae": 0.003002133148165591,
+      "seg/Q-Peak/soft_dice": 0.23740470892365517,
+      "seg/Q-Peak/hard_dice": 0.8138292225551567,
+      "seg/Q-Peak/mae": 0.0022412473524126603,
+      "seg/qr/soft_dice": 0.44318658894331253,
+      "seg/qr/hard_dice": 0.9405782384043144,
+      "seg/qr/mae": 0.003263398740593144,
+      "seg/R-Peak/soft_dice": 0.32606479980942465,
+      "seg/R-Peak/hard_dice": 0.9274463702393324,
+      "seg/R-Peak/mae": 0.0025291816565641174,
+      "seg/rs/soft_dice": 0.3547755972265398,
+      "seg/rs/hard_dice": 0.9141359934348324,
+      "seg/rs/mae": 0.0030739288607763092,
+      "seg/S-Peak/soft_dice": 0.25981775923477896,
+      "seg/S-Peak/hard_dice": 0.8732611205841189,
+      "seg/S-Peak/mae": 0.0023807210635878586,
+      "seg/q)/soft_dice": 0.3509009188387885,
+      "seg/q)/hard_dice": 0.91590672430747,
+      "seg/q)/mae": 0.00293776254419634,
+      "seg/QRS-Offset/soft_dice": 0.25632829202684393,
+      "seg/QRS-Offset/hard_dice": 0.8814718404649915,
+      "seg/QRS-Offset/mae": 0.002425794287309308,
+      "seg/qj/soft_dice": 0.43245260704299754,
+      "seg/qj/hard_dice": 0.9490866904404243,
+      "seg/qj/mae": 0.004342735634162493,
+      "seg/J-point/soft_dice": 0.1512774124519991,
+      "seg/J-point/hard_dice": 0.5383438191568876,
+      "seg/J-point/mae": 0.002230854154175471,
+      "seg/jt/soft_dice": 0.3278426817907499,
+      "seg/jt/hard_dice": 0.8887726392293912,
+      "seg/jt/mae": 0.005241938579722466,
+      "seg/T-Onset/soft_dice": 0.12349039636393998,
+      "seg/T-Onset/hard_dice": 0.644223954684122,
+      "seg/T-Onset/mae": 0.002875032928230765,
+      "seg/(t/soft_dice": 0.6240387678413555,
+      "seg/(t/hard_dice": 0.9638644721000889,
+      "seg/(t/mae": 0.011226846537012962,
+      "seg/T-Peak/soft_dice": 0.20421711498029493,
+      "seg/T-Peak/hard_dice": 0.7996399298905748,
+      "seg/T-Peak/mae": 0.00329836848348352,
+      "seg/t)/soft_dice": 0.5322905237255882,
+      "seg/t)/hard_dice": 0.9497070249730687,
+      "seg/t)/mae": 0.01095850856180512,
+      "seg/T-Offset/soft_dice": 0.17631484046353132,
+      "seg/T-Offset/hard_dice": 0.789067719417609,
+      "seg/T-Offset/mae": 0.0028791931801432366,
+      "seg/tp/soft_dice": 0.7876657460024076,
+      "seg/tp/hard_dice": 0.9776278539382567,
+      "seg/tp/mae": 0.019822885209587728,
+      "seg/macro_soft_dice": 0.33831308714610414,
+      "seg/macro_hard_dice": 0.8427740457553018,
+      "pathology/NORM/auroc": 0.9281597235360148,
+      "pathology/MI/auroc": 0.890947705207414,
+      "pathology/STTC/auroc": 0.9239656042384997,
+      "pathology/CD/auroc": 0.8892775577119897,
+      "pathology/HYP/auroc": 0.8090725742855341,
+      "pathology/macro_auroc": 0.8882846329958906,
+      "pathology/macro_auroc_ci95_lo": 0.8795222119236538,
+      "pathology/macro_auroc_ci95_hi": 0.8971425509379142,
+      "pathology/macro_auroc_boot_std": 0.004539432386361211,
+      "pathology/NORM/auroc_ci95_lo": 0.9183198982773708,
+      "pathology/NORM/auroc_ci95_hi": 0.9379094029901616,
+      "pathology/MI/auroc_ci95_lo": 0.8756558530902654,
+      "pathology/MI/auroc_ci95_hi": 0.9046239645268447,
+      "pathology/STTC/auroc_ci95_lo": 0.9120916244479385,
+      "pathology/STTC/auroc_ci95_hi": 0.9365027404799743,
+      "pathology/CD/auroc_ci95_lo": 0.8713276903271919,
+      "pathology/CD/auroc_ci95_hi": 0.9063109190132411,
+      "pathology/HYP/auroc_ci95_lo": 0.7802134273134897,
+      "pathology/HYP/auroc_ci95_hi": 0.8374547291720049,
+      "pathology/intervened_macro_auroc": 0.8929547488559839,
+      "pathology/intervention_gain": 0.00467011586009336,
+      "leakage/gt_mask_probe_auroc": 0.8419611413092,
+      "leakage/pred_mask_probe_auroc": 0.8405027387523344,
+      "leakage/bottleneck_probe_auroc": 0.8405027387523344,
+      "leakage/soft_mask_excess_auroc": -0.001458402556865579,
+      "leakage/bottleneck_excess_auroc": -0.001458402556865579,
+      "uncertainty/seg_error_detection_auroc": 0.756231407820148,
+      "uncertainty/mean_per_timestamp_std": 0.004991183988749981,
+      "uncertainty/boundary_std": 0.006748189063121875,
+      "uncertainty/interior_std": 0.004190282430499792,
+      "uncertainty/boundary_vs_interior": 1.6104377628590993,
+      "counterfactual/ablate_P-Onset_task_shift": 0.06592111165324847,
+      "counterfactual/ablate_(p_task_shift": 0.14395282169183096,
+      "counterfactual/ablate_P-Peak_task_shift": 0.0986843208471934,
+      "counterfactual/ablate_p)_task_shift": 0.1480127970377604,
+      "counterfactual/ablate_P-Offset_task_shift": 0.10232716053724289,
+      "counterfactual/ablate_pq_task_shift": 0.037799047927061714,
+      "counterfactual/ablate_QRS-Onset_task_shift": 0.09208185970783234,
+      "counterfactual/ablate_(q_task_shift": 0.21474299828211466,
+      "counterfactual/ablate_Q-Peak_task_shift": 0.056553258250157036,
+      "counterfactual/ablate_qr_task_shift": 0.14154647290706635,
+      "counterfactual/ablate_R-Peak_task_shift": 0.2414399782816569,
+      "counterfactual/ablate_rs_task_shift": 0.16903996467590332,
+      "counterfactual/ablate_S-Peak_task_shift": 0.049362865587075554,
+      "counterfactual/ablate_q)_task_shift": 0.12385199715693791,
+      "counterfactual/ablate_QRS-Offset_task_shift": 0.1209528570373853,
+      "counterfactual/ablate_qj_task_shift": 0.13882709542910257,
+      "counterfactual/ablate_J-point_task_shift": 0.07595955580472946,
+      "counterfactual/ablate_jt_task_shift": 0.08270494888226192,
+      "counterfactual/ablate_T-Onset_task_shift": 0.07052069157361984,
+      "counterfactual/ablate_(t_task_shift": 0.18835443258285522,
+      "counterfactual/ablate_T-Peak_task_shift": 0.031222762539982796,
+      "counterfactual/ablate_t)_task_shift": 0.19805156687895456,
+      "counterfactual/ablate_T-Offset_task_shift": 0.03797168657183647,
+      "counterfactual/ablate_tp_task_shift": 0.38629792133967084,
+      "pathology/macro_ece": 0.0505765251157313,
+      "pathology/macro_brier": 0.101507154810068,
+      "pathology/mc_macro_auroc": 0.8901520697401587,
+      "pathology/mc_ece": 0.026644440358590194,
+      "pathology/mc_brier": 0.09715880174480526,
+      "uncertainty/task_error_detection_auroc": 0.7962336528305959,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7984807304123479,
+      "uncertainty/task_mean_std": 0.029481226578354836
+    },
+    "dense_cbm_joint_s42": {
+      "seg/argmax_acc": 0.9600800727934485,
+      "seg/mean_kl": 0.03236390109838845,
+      "seg/mean_mae": 0.01777622694154924,
+      "seg/P/soft_dice": 0.7427100609023546,
+      "seg/P/hard_dice": 0.9520734423072723,
+      "seg/P/mae": 0.025067196485885606,
+      "seg/PQ/soft_dice": 0.36993586513436966,
+      "seg/PQ/hard_dice": 0.8102605863220796,
+      "seg/PQ/mae": 0.007111325952115115,
+      "seg/QRS/soft_dice": 0.8487352642881255,
+      "seg/QRS/hard_dice": 0.9727494688585369,
+      "seg/QRS/mae": 0.010343944657163472,
+      "seg/ST/soft_dice": 0.6095043218433602,
+      "seg/ST/hard_dice": 0.9280033935947699,
+      "seg/ST/mae": 0.014714666420378612,
+      "seg/T/soft_dice": 0.7676318014897591,
+      "seg/T/hard_dice": 0.9664783112736157,
+      "seg/T/mae": 0.02438144809490339,
+      "seg/TP/soft_dice": 0.7917374516686608,
+      "seg/TP/hard_dice": 0.9708937918648003,
+      "seg/TP/mae": 0.025038780038849236,
+      "seg/macro_soft_dice": 0.6883757942211051,
+      "seg/macro_hard_dice": 0.9334098323701792,
+      "pathology/NORM/auroc": 0.943868477808468,
+      "pathology/MI/auroc": 0.9229346866725509,
+      "pathology/STTC/auroc": 0.9324348947383174,
+      "pathology/CD/auroc": 0.9319959203593495,
+      "pathology/HYP/auroc": 0.8261801305911297,
+      "pathology/macro_auroc": 0.9114828220339632,
+      "pathology/macro_auroc_ci95_lo": 0.9031292431369422,
+      "pathology/macro_auroc_ci95_hi": 0.9191828469743676,
+      "pathology/macro_auroc_boot_std": 0.004169277478029764,
+      "pathology/NORM/auroc_ci95_lo": 0.9354782492967059,
+      "pathology/NORM/auroc_ci95_hi": 0.9520933591243642,
+      "pathology/MI/auroc_ci95_lo": 0.9110897515492967,
+      "pathology/MI/auroc_ci95_hi": 0.934551514952869,
+      "pathology/STTC/auroc_ci95_lo": 0.920834527621845,
+      "pathology/STTC/auroc_ci95_hi": 0.9450418301289937,
+      "pathology/CD/auroc_ci95_lo": 0.9177641901499748,
+      "pathology/CD/auroc_ci95_hi": 0.9442453663596769,
+      "pathology/HYP/auroc_ci95_lo": 0.797895780217072,
+      "pathology/HYP/auroc_ci95_hi": 0.8514301552838089,
+      "pathology/intervened_macro_auroc": 0.8183459738423016,
+      "pathology/intervention_gain": -0.09313684819166168,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8715883962093247,
+      "leakage/bottleneck_probe_auroc": 0.8715883962093247,
+      "leakage/soft_mask_excess_auroc": 0.07737686054480775,
+      "leakage/bottleneck_excess_auroc": 0.07737686054480775,
+      "uncertainty/seg_error_detection_auroc": 0.848917862580996,
+      "uncertainty/mean_per_timestamp_std": 0.01190470065921545,
+      "uncertainty/boundary_std": 0.01992172251145045,
+      "uncertainty/interior_std": 0.010815558955073357,
+      "uncertainty/boundary_vs_interior": 1.841950341559146,
+      "counterfactual/ablate_P_task_shift": 0.18118678033351898,
+      "counterfactual/ablate_PQ_task_shift": 0.06967825070023537,
+      "counterfactual/ablate_QRS_task_shift": 0.20901034275690714,
+      "counterfactual/ablate_ST_task_shift": 0.27736087143421173,
+      "counterfactual/ablate_T_task_shift": 0.18538354833920798,
+      "pathology/macro_ece": 0.04480995686833621,
+      "pathology/macro_brier": 0.08943868561256141,
+      "pathology/mc_macro_auroc": 0.9118205659444533,
+      "pathology/mc_ece": 0.03899220775756517,
+      "pathology/mc_brier": 0.08830615916363675,
+      "uncertainty/task_error_detection_auroc": 0.8165999046550496,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8199778097464859,
+      "uncertainty/task_mean_std": 0.022389858961105347
+    },
+    "dense_cbm_joint_s43": {
+      "seg/argmax_acc": 0.9575136487716106,
+      "seg/mean_kl": 0.03358308431470904,
+      "seg/mean_mae": 0.018219267877839642,
+      "seg/P/soft_dice": 0.7398467693564424,
+      "seg/P/hard_dice": 0.942679626978949,
+      "seg/P/mae": 0.02708812218649589,
+      "seg/PQ/soft_dice": 0.388442464772401,
+      "seg/PQ/hard_dice": 0.7266105641074542,
+      "seg/PQ/mae": 0.009572796711388016,
+      "seg/QRS/soft_dice": 0.8509335072046079,
+      "seg/QRS/hard_dice": 0.9722459345580459,
+      "seg/QRS/mae": 0.01133775374019439,
+      "seg/ST/soft_dice": 0.610785395927109,
+      "seg/ST/hard_dice": 0.9361234091398036,
+      "seg/ST/mae": 0.01231982674568322,
+      "seg/T/soft_dice": 0.7666254874852151,
+      "seg/T/hard_dice": 0.9686025108448023,
+      "seg/T/mae": 0.02347791016069296,
+      "seg/TP/soft_dice": 0.7856369317854237,
+      "seg/TP/hard_dice": 0.970258792559495,
+      "seg/TP/mae": 0.025519197722583386,
+      "seg/macro_soft_dice": 0.6903784260885333,
+      "seg/macro_hard_dice": 0.9194201396980916,
+      "pathology/NORM/auroc": 0.9427030913012222,
+      "pathology/MI/auroc": 0.9285155560458959,
+      "pathology/STTC/auroc": 0.9309567693587121,
+      "pathology/CD/auroc": 0.9250152808839696,
+      "pathology/HYP/auroc": 0.8141146457636742,
+      "pathology/macro_auroc": 0.9082610686706948,
+      "pathology/macro_auroc_ci95_lo": 0.9007503240110445,
+      "pathology/macro_auroc_ci95_hi": 0.9163490773802931,
+      "pathology/macro_auroc_boot_std": 0.004191605636168423,
+      "pathology/NORM/auroc_ci95_lo": 0.9345465797008685,
+      "pathology/NORM/auroc_ci95_hi": 0.9514447175691042,
+      "pathology/MI/auroc_ci95_lo": 0.9158397788449519,
+      "pathology/MI/auroc_ci95_hi": 0.9394448215121822,
+      "pathology/STTC/auroc_ci95_lo": 0.9204071266267752,
+      "pathology/STTC/auroc_ci95_hi": 0.9434386518894848,
+      "pathology/CD/auroc_ci95_lo": 0.9098002044816916,
+      "pathology/CD/auroc_ci95_hi": 0.9387816538325546,
+      "pathology/HYP/auroc_ci95_lo": 0.7872474010076801,
+      "pathology/HYP/auroc_ci95_hi": 0.8401053349621957,
+      "pathology/intervened_macro_auroc": 0.8340285363834731,
+      "pathology/intervention_gain": -0.07423253228722171,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8638735599839877,
+      "leakage/bottleneck_probe_auroc": 0.8638735599839877,
+      "leakage/soft_mask_excess_auroc": 0.06966202431947077,
+      "leakage/bottleneck_excess_auroc": 0.06966202431947077,
+      "uncertainty/seg_error_detection_auroc": 0.8545082572843709,
+      "uncertainty/mean_per_timestamp_std": 0.012204456143081188,
+      "uncertainty/boundary_std": 0.020236458629369736,
+      "uncertainty/interior_std": 0.011098421489199003,
+      "uncertainty/boundary_vs_interior": 1.8233636782549556,
+      "counterfactual/ablate_P_task_shift": 0.13773474842309952,
+      "counterfactual/ablate_PQ_task_shift": 0.07527814557154973,
+      "counterfactual/ablate_QRS_task_shift": 0.2747860948244731,
+      "counterfactual/ablate_ST_task_shift": 0.18958145876725516,
+      "counterfactual/ablate_T_task_shift": 0.16747272511323294,
+      "pathology/macro_ece": 0.05246430879381544,
+      "pathology/macro_brier": 0.09148758855415287,
+      "pathology/mc_macro_auroc": 0.9090241590750814,
+      "pathology/mc_ece": 0.042641439409443496,
+      "pathology/mc_brier": 0.08901652570930751,
+      "uncertainty/task_error_detection_auroc": 0.8139019419076968,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8151541729388423,
+      "uncertainty/task_mean_std": 0.02002798765897751
+    },
+    "dense_cbm_joint_s44": {
+      "seg/argmax_acc": 0.9598735213830756,
+      "seg/mean_kl": 0.032910168440370154,
+      "seg/mean_mae": 0.018045741266650362,
+      "seg/P/soft_dice": 0.7423049485903519,
+      "seg/P/hard_dice": 0.9494032435427443,
+      "seg/P/mae": 0.026116659843021355,
+      "seg/PQ/soft_dice": 0.37296954616063094,
+      "seg/PQ/hard_dice": 0.793856103479182,
+      "seg/PQ/mae": 0.007672171227383114,
+      "seg/QRS/soft_dice": 0.8485727642745057,
+      "seg/QRS/hard_dice": 0.9740673228825282,
+      "seg/QRS/mae": 0.010425409304867884,
+      "seg/ST/soft_dice": 0.6033589355405892,
+      "seg/ST/hard_dice": 0.9319382544047226,
+      "seg/ST/mae": 0.013174579415568663,
+      "seg/T/soft_dice": 0.7741541951829475,
+      "seg/T/hard_dice": 0.9672554422364913,
+      "seg/T/mae": 0.02450440511104733,
+      "seg/TP/soft_dice": 0.7941251619582655,
+      "seg/TP/hard_dice": 0.9703082294433667,
+      "seg/TP/mae": 0.02638122269801382,
+      "seg/macro_soft_dice": 0.6892475919512151,
+      "seg/macro_hard_dice": 0.9311380993315059,
+      "pathology/NORM/auroc": 0.9395230828088674,
+      "pathology/MI/auroc": 0.9214507943512797,
+      "pathology/STTC/auroc": 0.9298897859258636,
+      "pathology/CD/auroc": 0.9242838122133353,
+      "pathology/HYP/auroc": 0.8207279903476121,
+      "pathology/macro_auroc": 0.9071750931293916,
+      "pathology/macro_auroc_ci95_lo": 0.8987399334592955,
+      "pathology/macro_auroc_ci95_hi": 0.9152138742313741,
+      "pathology/macro_auroc_boot_std": 0.00421079578041901,
+      "pathology/NORM/auroc_ci95_lo": 0.9308252612369012,
+      "pathology/NORM/auroc_ci95_hi": 0.9480789170460604,
+      "pathology/MI/auroc_ci95_lo": 0.9086332100492376,
+      "pathology/MI/auroc_ci95_hi": 0.9339681035551586,
+      "pathology/STTC/auroc_ci95_lo": 0.9185676086420248,
+      "pathology/STTC/auroc_ci95_hi": 0.9417249382487666,
+      "pathology/CD/auroc_ci95_lo": 0.9095058867267674,
+      "pathology/CD/auroc_ci95_hi": 0.9381453144728443,
+      "pathology/HYP/auroc_ci95_lo": 0.7931590226695636,
+      "pathology/HYP/auroc_ci95_hi": 0.8466620461643694,
+      "pathology/intervened_macro_auroc": 0.830404183760994,
+      "pathology/intervention_gain": -0.07677090936839759,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.87302826777498,
+      "leakage/bottleneck_probe_auroc": 0.87302826777498,
+      "leakage/soft_mask_excess_auroc": 0.07881673211046303,
+      "leakage/bottleneck_excess_auroc": 0.07881673211046303,
+      "uncertainty/seg_error_detection_auroc": 0.8524830196663821,
+      "uncertainty/mean_per_timestamp_std": 0.011846810579299927,
+      "uncertainty/boundary_std": 0.02018549293279648,
+      "uncertainty/interior_std": 0.0107002854347229,
+      "uncertainty/boundary_vs_interior": 1.8864443435586924,
+      "counterfactual/ablate_P_task_shift": 0.1698620319366455,
+      "counterfactual/ablate_PQ_task_shift": 0.06393532951672871,
+      "counterfactual/ablate_QRS_task_shift": 0.33799563844998676,
+      "counterfactual/ablate_ST_task_shift": 0.18811787168184915,
+      "counterfactual/ablate_T_task_shift": 0.11315137892961502,
+      "pathology/macro_ece": 0.055650658583892024,
+      "pathology/macro_brier": 0.09348991641718257,
+      "pathology/mc_macro_auroc": 0.9076447918849151,
+      "pathology/mc_ece": 0.04669973483964503,
+      "pathology/mc_brier": 0.09135573266164802,
+      "uncertainty/task_error_detection_auroc": 0.8195960123501731,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8200435834145574,
+      "uncertainty/task_mean_std": 0.021409936249256134
+    },
+    "dense_cbm_norandint": {
+      "seg/argmax_acc": 0.9592870791628754,
+      "seg/mean_kl": 0.03237028135485384,
+      "seg/mean_mae": 0.0177409581018644,
+      "seg/P/soft_dice": 0.7420556879850095,
+      "seg/P/hard_dice": 0.9517272789487047,
+      "seg/P/mae": 0.02510356944034705,
+      "seg/PQ/soft_dice": 0.36694635015694416,
+      "seg/PQ/hard_dice": 0.8116211115874533,
+      "seg/PQ/mae": 0.007007479854233163,
+      "seg/QRS/soft_dice": 0.8492658862658604,
+      "seg/QRS/hard_dice": 0.9730559719226821,
+      "seg/QRS/mae": 0.009860064075251293,
+      "seg/ST/soft_dice": 0.6032373671339555,
+      "seg/ST/hard_dice": 0.9270238734279223,
+      "seg/ST/mae": 0.014305439207096118,
+      "seg/T/soft_dice": 0.765988338197905,
+      "seg/T/hard_dice": 0.9649793839696025,
+      "seg/T/mae": 0.024521385519150934,
+      "seg/TP/soft_dice": 0.7915592444262923,
+      "seg/TP/hard_dice": 0.969616933178762,
+      "seg/TP/mae": 0.02564781051510784,
+      "seg/macro_soft_dice": 0.6865088123609945,
+      "seg/macro_hard_dice": 0.9330040921725211,
+      "pathology/NORM/auroc": 0.9440660722018321,
+      "pathology/MI/auroc": 0.925479920564872,
+      "pathology/STTC/auroc": 0.9329768545772247,
+      "pathology/CD/auroc": 0.9297902609832833,
+      "pathology/HYP/auroc": 0.8265310548230395,
+      "pathology/macro_auroc": 0.9117688326300504,
+      "pathology/macro_auroc_ci95_lo": 0.9034766000135349,
+      "pathology/macro_auroc_ci95_hi": 0.9195627682855853,
+      "pathology/macro_auroc_boot_std": 0.004126393813261228,
+      "pathology/NORM/auroc_ci95_lo": 0.9357200835866435,
+      "pathology/NORM/auroc_ci95_hi": 0.952301737496026,
+      "pathology/MI/auroc_ci95_lo": 0.913393289361898,
+      "pathology/MI/auroc_ci95_hi": 0.9369827975346491,
+      "pathology/STTC/auroc_ci95_lo": 0.9217888829708182,
+      "pathology/STTC/auroc_ci95_hi": 0.9447658610651262,
+      "pathology/CD/auroc_ci95_lo": 0.9150358981899283,
+      "pathology/CD/auroc_ci95_hi": 0.9427303994738845,
+      "pathology/HYP/auroc_ci95_lo": 0.7989114631652365,
+      "pathology/HYP/auroc_ci95_hi": 0.8520042615246426,
+      "pathology/intervened_macro_auroc": 0.7928400785131127,
+      "pathology/intervention_gain": -0.11892875411693771,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8795903486982631,
+      "leakage/bottleneck_probe_auroc": 0.8795903486982631,
+      "leakage/soft_mask_excess_auroc": 0.08537881303374617,
+      "leakage/bottleneck_excess_auroc": 0.08537881303374617,
+      "uncertainty/seg_error_detection_auroc": 0.8454635196073002,
+      "uncertainty/mean_per_timestamp_std": 0.012073942460119724,
+      "uncertainty/boundary_std": 0.020171765238046646,
+      "uncertainty/interior_std": 0.010954268587132296,
+      "uncertainty/boundary_vs_interior": 1.8414524965858434,
+      "counterfactual/ablate_P_task_shift": 0.26310498515764874,
+      "counterfactual/ablate_PQ_task_shift": 0.07898056010405223,
+      "counterfactual/ablate_QRS_task_shift": 0.1800047109524409,
+      "counterfactual/ablate_ST_task_shift": 0.3564375936985016,
+      "counterfactual/ablate_T_task_shift": 0.2899777789910634,
+      "pathology/macro_ece": 0.047330325791530556,
+      "pathology/macro_brier": 0.0891172749944701,
+      "pathology/mc_macro_auroc": 0.9122773749020876,
+      "pathology/mc_ece": 0.03839070823314987,
+      "pathology/mc_brier": 0.08730860053584379,
+      "uncertainty/task_error_detection_auroc": 0.8210612385368783,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8248407590361904,
+      "uncertainty/task_mean_std": 0.022740913555026054
+    },
+    "dense_cbm_softseg": {
+      "seg/argmax_acc": 0.9580846223839854,
+      "seg/mean_kl": 0.033102589045794474,
+      "seg/mean_mae": 0.01823195363681968,
+      "seg/P/soft_dice": 0.7416572479788841,
+      "seg/P/hard_dice": 0.9494831502122265,
+      "seg/P/mae": 0.025555632378645003,
+      "seg/PQ/soft_dice": 0.3770262970354764,
+      "seg/PQ/hard_dice": 0.798548201484279,
+      "seg/PQ/mae": 0.00768563869847722,
+      "seg/QRS/soft_dice": 0.8528055003632359,
+      "seg/QRS/hard_dice": 0.9713966150147255,
+      "seg/QRS/mae": 0.01068479736161514,
+      "seg/ST/soft_dice": 0.6140223461551354,
+      "seg/ST/hard_dice": 0.92227466204252,
+      "seg/ST/mae": 0.015750848674687394,
+      "seg/T/soft_dice": 0.7639861800507772,
+      "seg/T/hard_dice": 0.9646699961336687,
+      "seg/T/mae": 0.024856591902395288,
+      "seg/TP/soft_dice": 0.7876750123961577,
+      "seg/TP/hard_dice": 0.9707976549352003,
+      "seg/TP/mae": 0.02485821280509803,
+      "seg/macro_soft_dice": 0.6895287639966111,
+      "seg/macro_hard_dice": 0.9295283799704367,
+      "pathology/NORM/auroc": 0.9374332067888389,
+      "pathology/MI/auroc": 0.9188603265666373,
+      "pathology/STTC/auroc": 0.9273878937384952,
+      "pathology/CD/auroc": 0.9263958909821461,
+      "pathology/HYP/auroc": 0.8199738975458961,
+      "pathology/macro_auroc": 0.9060102431244028,
+      "pathology/intervened_macro_auroc": 0.8173414090934081,
+      "pathology/intervention_gain": -0.08866883403099468,
+      "uncertainty/seg_error_detection_auroc": 0.8406429662728051,
+      "uncertainty/mean_per_timestamp_std": 0.01210501603782177,
+      "uncertainty/boundary_std": 0.019718196243047714,
+      "uncertainty/interior_std": 0.011064765974879265,
+      "uncertainty/boundary_vs_interior": 1.7820707900930433,
+      "counterfactual/ablate_P_task_shift": 0.22484774887561798,
+      "counterfactual/ablate_PQ_task_shift": 0.05920488884051641,
+      "counterfactual/ablate_QRS_task_shift": 0.23262299597263336,
+      "counterfactual/ablate_ST_task_shift": 0.3463763892650604,
+      "counterfactual/ablate_T_task_shift": 0.17773155868053436,
+      "pathology/macro_ece": 0.06201720159998928,
+      "pathology/macro_brier": 0.09685633237566611,
+      "pathology/mc_macro_auroc": 0.9060565513370602,
+      "pathology/mc_ece": 0.057198690630518224,
+      "pathology/mc_brier": 0.09558110972468632,
+      "uncertainty/task_error_detection_auroc": 0.808020085569581,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8101678844185545,
+      "uncertainty/task_mean_std": 0.023063817992806435
+    },
+    "dense_cem_fiducial24": {
+      "seg/argmax_acc": 0.9098039126478616,
+      "seg/mean_kl": 0.06300186032268326,
+      "seg/mean_mae": 0.008048898286446319,
+      "seg/P-Onset/soft_dice": 0.09066468284295179,
+      "seg/P-Onset/hard_dice": 0.013947002769948392,
+      "seg/P-Onset/mae": 0.005121653549013841,
+      "seg/(p/soft_dice": 0.5112613490063826,
+      "seg/(p/hard_dice": 0.8929405797000456,
+      "seg/(p/mae": 0.022859037862678785,
+      "seg/P-Peak/soft_dice": 0.19016037632454447,
+      "seg/P-Peak/hard_dice": 0.6327509900008036,
+      "seg/P-Peak/mae": 0.005311666459143433,
+      "seg/p)/soft_dice": 0.5368516634697833,
+      "seg/p)/hard_dice": 0.9054240733576092,
+      "seg/p)/mae": 0.013203226507740523,
+      "seg/P-Offset/soft_dice": 0.17364242762252774,
+      "seg/P-Offset/hard_dice": 0.5923380686398103,
+      "seg/P-Offset/mae": 0.003554836800794801,
+      "seg/pq/soft_dice": 0.3404162174150756,
+      "seg/pq/hard_dice": 0.8376839239595373,
+      "seg/pq/mae": 0.006988196625505609,
+      "seg/QRS-Onset/soft_dice": 0.20824166652698528,
+      "seg/QRS-Onset/hard_dice": 0.5964784777643131,
+      "seg/QRS-Onset/mae": 0.0034045632720752887,
+      "seg/(q/soft_dice": 0.3478985071095977,
+      "seg/(q/hard_dice": 0.8502222375370376,
+      "seg/(q/mae": 0.004680480554388045,
+      "seg/Q-Peak/soft_dice": 0.1989919399567855,
+      "seg/Q-Peak/hard_dice": 0.5036235385301178,
+      "seg/Q-Peak/mae": 0.0038340030284878123,
+      "seg/qr/soft_dice": 0.4304199223268838,
+      "seg/qr/hard_dice": 0.8942822471276015,
+      "seg/qr/mae": 0.005346656938158891,
+      "seg/R-Peak/soft_dice": 0.2957799578783736,
+      "seg/R-Peak/hard_dice": 0.8774981257389419,
+      "seg/R-Peak/mae": 0.0040560903401674194,
+      "seg/rs/soft_dice": 0.33301531850204424,
+      "seg/rs/hard_dice": 0.8438267587613227,
+      "seg/rs/mae": 0.005013597233280255,
+      "seg/S-Peak/soft_dice": 0.2438417657625673,
+      "seg/S-Peak/hard_dice": 0.7416127755116375,
+      "seg/S-Peak/mae": 0.004235834040134142,
+      "seg/q)/soft_dice": 0.32284979410888237,
+      "seg/q)/hard_dice": 0.8295986455551173,
+      "seg/q)/mae": 0.005034981322353595,
+      "seg/QRS-Offset/soft_dice": 0.23356377568048114,
+      "seg/QRS-Offset/hard_dice": 0.7736219199393446,
+      "seg/QRS-Offset/mae": 0.004234576686064258,
+      "seg/qj/soft_dice": 0.4241297003871844,
+      "seg/qj/hard_dice": 0.9188584176019687,
+      "seg/qj/mae": 0.0065301280555343285,
+      "seg/J-point/soft_dice": 0.15119914899556497,
+      "seg/J-point/hard_dice": 0.2903455647861871,
+      "seg/J-point/mae": 0.003143374095080222,
+      "seg/jt/soft_dice": 0.33395121688615514,
+      "seg/jt/hard_dice": 0.830876298245339,
+      "seg/jt/mae": 0.00829456885409854,
+      "seg/T-Onset/soft_dice": 0.11371934394605128,
+      "seg/T-Onset/hard_dice": 0.32025951056911534,
+      "seg/T-Onset/mae": 0.0044282482379777955,
+      "seg/(t/soft_dice": 0.603265338586449,
+      "seg/(t/hard_dice": 0.9435067906009924,
+      "seg/(t/mae": 0.017593086319039147,
+      "seg/T-Peak/soft_dice": 0.18114578402851758,
+      "seg/T-Peak/hard_dice": 0.681854516402785,
+      "seg/T-Peak/mae": 0.005061130627813504,
+      "seg/t)/soft_dice": 0.5020840402589272,
+      "seg/t)/hard_dice": 0.9233177404733566,
+      "seg/t)/mae": 0.018072780341859076,
+      "seg/T-Offset/soft_dice": 0.16995128888872438,
+      "seg/T-Offset/hard_dice": 0.6516501917759602,
+      "seg/T-Offset/mae": 0.00465036938209985,
+      "seg/tp/soft_dice": 0.7743625264005809,
+      "seg/tp/hard_dice": 0.9699882006892538,
+      "seg/tp/mae": 0.02852047174122249,
+      "seg/macro_soft_dice": 0.32130865637133427,
+      "seg/macro_hard_dice": 0.7215211081682561,
+      "pathology/NORM/auroc": 0.9383055650148615,
+      "pathology/MI/auroc": 0.9037604810238306,
+      "pathology/STTC/auroc": 0.9283444995748419,
+      "pathology/CD/auroc": 0.9147131221333537,
+      "pathology/HYP/auroc": 0.8050162450318592,
+      "pathology/macro_auroc": 0.8980279825557493,
+      "pathology/macro_auroc_ci95_lo": 0.8895500718761691,
+      "pathology/macro_auroc_ci95_hi": 0.9069920325443587,
+      "pathology/macro_auroc_boot_std": 0.004505222744553084,
+      "pathology/NORM/auroc_ci95_lo": 0.92929116156758,
+      "pathology/NORM/auroc_ci95_hi": 0.9475573740902731,
+      "pathology/MI/auroc_ci95_lo": 0.8893401951139891,
+      "pathology/MI/auroc_ci95_hi": 0.9162829480285908,
+      "pathology/STTC/auroc_ci95_lo": 0.9161824083940795,
+      "pathology/STTC/auroc_ci95_hi": 0.9407360394925508,
+      "pathology/CD/auroc_ci95_lo": 0.8997344687496333,
+      "pathology/CD/auroc_ci95_hi": 0.9302232785435225,
+      "pathology/HYP/auroc_ci95_lo": 0.7755773466406127,
+      "pathology/HYP/auroc_ci95_hi": 0.8342715300280193,
+      "pathology/intervened_macro_auroc": 0.8983839789436383,
+      "pathology/intervention_gain": 0.00035599638788896826,
+      "leakage/gt_mask_probe_auroc": 0.8419611413092,
+      "leakage/pred_mask_probe_auroc": 0.8734179881034063,
+      "leakage/bottleneck_probe_auroc": 0.8928517596494354,
+      "leakage/soft_mask_excess_auroc": 0.03145684679420635,
+      "leakage/bottleneck_excess_auroc": 0.05089061834023545,
+      "uncertainty/seg_error_detection_auroc": 0.7956119324052687,
+      "uncertainty/mean_per_timestamp_std": 0.005029184278100729,
+      "uncertainty/boundary_std": 0.007261829761167367,
+      "uncertainty/interior_std": 0.003984568174928427,
+      "uncertainty/boundary_vs_interior": 1.822488521305777,
+      "counterfactual/ablate_P-Onset_task_shift": 0.00025607932669421035,
+      "counterfactual/ablate_(p_task_shift": 0.0027192876829455295,
+      "counterfactual/ablate_P-Peak_task_shift": 0.0006023285677656531,
+      "counterfactual/ablate_p)_task_shift": 0.006008828369279702,
+      "counterfactual/ablate_P-Offset_task_shift": 0.0002473020285833627,
+      "counterfactual/ablate_pq_task_shift": 0.0005339322087820619,
+      "counterfactual/ablate_QRS-Onset_task_shift": 0.0004545773263089359,
+      "counterfactual/ablate_(q_task_shift": 0.000583504249031345,
+      "counterfactual/ablate_Q-Peak_task_shift": 0.00023235752693532655,
+      "counterfactual/ablate_qr_task_shift": 0.0025313522977133593,
+      "counterfactual/ablate_R-Peak_task_shift": 0.00105655441681544,
+      "counterfactual/ablate_rs_task_shift": 0.003691618020335833,
+      "counterfactual/ablate_S-Peak_task_shift": 0.001125747764793535,
+      "counterfactual/ablate_q)_task_shift": 0.006045334196339051,
+      "counterfactual/ablate_QRS-Offset_task_shift": 0.0029979983810335398,
+      "counterfactual/ablate_qj_task_shift": 0.005815810989588499,
+      "counterfactual/ablate_J-point_task_shift": 0.0007966881967149675,
+      "counterfactual/ablate_jt_task_shift": 0.0016431572148576379,
+      "counterfactual/ablate_T-Onset_task_shift": 0.00018512288321896145,
+      "counterfactual/ablate_(t_task_shift": 0.00917816317329804,
+      "counterfactual/ablate_T-Peak_task_shift": 0.0033928132615983486,
+      "counterfactual/ablate_t)_task_shift": 0.0822879324356715,
+      "counterfactual/ablate_T-Offset_task_shift": 0.005348947364836931,
+      "counterfactual/ablate_tp_task_shift": 0.008327598838756481,
+      "pathology/macro_ece": 0.028938051833701,
+      "pathology/macro_brier": 0.0930301526665331,
+      "pathology/mc_macro_auroc": 0.8957169390361379,
+      "pathology/mc_ece": 0.03447987656087849,
+      "pathology/mc_brier": 0.09435575937091763,
+      "uncertainty/task_error_detection_auroc": 0.8022360258725577,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8037838472605302,
+      "uncertainty/task_mean_std": 0.020345602184534073
+    },
+    "dense_cem_nohetero": {
+      "seg/argmax_acc": 0.9615477707006369,
+      "seg/mean_kl": 0.031050835315263522,
+      "seg/mean_mae": 0.017746333716094295,
+      "seg/P/soft_dice": 0.7237944389505865,
+      "seg/P/hard_dice": 0.9487426395975543,
+      "seg/P/mae": 0.0275782334915175,
+      "seg/PQ/soft_dice": 0.3495893938251274,
+      "seg/PQ/hard_dice": 0.8200668254732927,
+      "seg/PQ/mae": 0.00654780350217394,
+      "seg/QRS/soft_dice": 0.8467394197542006,
+      "seg/QRS/hard_dice": 0.978519684465167,
+      "seg/QRS/mae": 0.00795211851694456,
+      "seg/ST/soft_dice": 0.5889843985628093,
+      "seg/ST/hard_dice": 0.9415875831487068,
+      "seg/ST/mae": 0.010562059182053376,
+      "seg/T/soft_dice": 0.7530389772137759,
+      "seg/T/hard_dice": 0.9684879133358198,
+      "seg/T/mae": 0.024128449763678984,
+      "seg/TP/soft_dice": 0.7692732426902976,
+      "seg/TP/hard_dice": 0.9681503291545576,
+      "seg/TP/mae": 0.02970933784019741,
+      "seg/macro_soft_dice": 0.6719033118327995,
+      "seg/macro_hard_dice": 0.9375924958625164,
+      "pathology/NORM/auroc": 0.9383988968347059,
+      "pathology/MI/auroc": 0.9111644969108562,
+      "pathology/STTC/auroc": 0.9296275661331166,
+      "pathology/CD/auroc": 0.9237531272506729,
+      "pathology/HYP/auroc": 0.8083726973061636,
+      "pathology/macro_auroc": 0.9022633568871029,
+      "pathology/macro_auroc_ci95_lo": 0.8940546590108653,
+      "pathology/macro_auroc_ci95_hi": 0.9102700636728391,
+      "pathology/macro_auroc_boot_std": 0.004172287725463113,
+      "pathology/NORM/auroc_ci95_lo": 0.9300429654629615,
+      "pathology/NORM/auroc_ci95_hi": 0.9476857353631861,
+      "pathology/MI/auroc_ci95_lo": 0.8970204780808779,
+      "pathology/MI/auroc_ci95_hi": 0.924395055687176,
+      "pathology/STTC/auroc_ci95_lo": 0.9184292702966703,
+      "pathology/STTC/auroc_ci95_hi": 0.9415139258151098,
+      "pathology/CD/auroc_ci95_lo": 0.9095079259947733,
+      "pathology/CD/auroc_ci95_hi": 0.9373967082333284,
+      "pathology/HYP/auroc_ci95_lo": 0.779330304143576,
+      "pathology/HYP/auroc_ci95_hi": 0.8363038043950527,
+      "pathology/intervened_macro_auroc": 0.9022960717710717,
+      "pathology/intervention_gain": 3.271488396883182e-05,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8058668410910543,
+      "leakage/bottleneck_probe_auroc": 0.9045413989074564,
+      "leakage/soft_mask_excess_auroc": 0.011655305426537366,
+      "leakage/bottleneck_excess_auroc": 0.11032986324293947,
+      "uncertainty/seg_error_detection_auroc": 0.860430471283742,
+      "uncertainty/mean_per_timestamp_std": 0.048316407948732376,
+      "uncertainty/boundary_std": 0.08171230554580688,
+      "uncertainty/interior_std": 0.04387220864494642,
+      "uncertainty/boundary_vs_interior": 1.8625072242680267,
+      "counterfactual/ablate_P_task_shift": 0.002883293122674028,
+      "counterfactual/ablate_PQ_task_shift": 0.0015629766276106238,
+      "counterfactual/ablate_QRS_task_shift": 0.06921432291467984,
+      "counterfactual/ablate_ST_task_shift": 0.007928746286779642,
+      "counterfactual/ablate_T_task_shift": 0.10048548380533855,
+      "pathology/macro_ece": 0.03384166715936014,
+      "pathology/macro_brier": 0.09239059497707816,
+      "pathology/mc_macro_auroc": 0.9025277881796597,
+      "pathology/mc_ece": 0.024522218165124295,
+      "pathology/mc_brier": 0.09121920144063649,
+      "uncertainty/task_error_detection_auroc": 0.8062923706895122,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8096646840936689,
+      "uncertainty/task_mean_std": 0.02622142806649208
+    },
+    "dense_cem_norandint": {
+      "seg/argmax_acc": 0.960958143767061,
+      "seg/mean_kl": 0.031194674990847503,
+      "seg/mean_mae": 0.017817352235913818,
+      "seg/P/soft_dice": 0.7244886208188819,
+      "seg/P/hard_dice": 0.947289151310332,
+      "seg/P/mae": 0.0279117196719141,
+      "seg/PQ/soft_dice": 0.35149706747046944,
+      "seg/PQ/hard_dice": 0.8158206565281694,
+      "seg/PQ/mae": 0.0067861950000488724,
+      "seg/QRS/soft_dice": 0.8468153838019554,
+      "seg/QRS/hard_dice": 0.978261530048037,
+      "seg/QRS/mae": 0.008356153132375312,
+      "seg/ST/soft_dice": 0.5983418783114894,
+      "seg/ST/hard_dice": 0.940960031888786,
+      "seg/ST/mae": 0.010357047826404241,
+      "seg/T/soft_dice": 0.7549711885282185,
+      "seg/T/hard_dice": 0.9683503386771399,
+      "seg/T/mae": 0.024045641523366412,
+      "seg/TP/soft_dice": 0.7703967567670535,
+      "seg/TP/hard_dice": 0.9676779798085449,
+      "seg/TP/mae": 0.029447356261373975,
+      "seg/macro_soft_dice": 0.6744184826163447,
+      "seg/macro_hard_dice": 0.9363932813768349,
+      "pathology/NORM/auroc": 0.9380827458053232,
+      "pathology/MI/auroc": 0.9113277802294792,
+      "pathology/STTC/auroc": 0.929511348452144,
+      "pathology/CD/auroc": 0.9259866238959857,
+      "pathology/HYP/auroc": 0.8090568024099426,
+      "pathology/macro_auroc": 0.902793060158575,
+      "pathology/macro_auroc_ci95_lo": 0.8947520055061626,
+      "pathology/macro_auroc_ci95_hi": 0.9107185694443034,
+      "pathology/macro_auroc_boot_std": 0.004192118961068518,
+      "pathology/NORM/auroc_ci95_lo": 0.929237528006798,
+      "pathology/NORM/auroc_ci95_hi": 0.9474966770920128,
+      "pathology/MI/auroc_ci95_lo": 0.8978542312520691,
+      "pathology/MI/auroc_ci95_hi": 0.9251420193101835,
+      "pathology/STTC/auroc_ci95_lo": 0.917580011455639,
+      "pathology/STTC/auroc_ci95_hi": 0.9419409937080575,
+      "pathology/CD/auroc_ci95_lo": 0.9120833780855009,
+      "pathology/CD/auroc_ci95_hi": 0.9390591713211351,
+      "pathology/HYP/auroc_ci95_lo": 0.7795946556949709,
+      "pathology/HYP/auroc_ci95_hi": 0.8369417510613861,
+      "pathology/intervened_macro_auroc": 0.9028129373467125,
+      "pathology/intervention_gain": 1.9877188137562563e-05,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8079918221794683,
+      "leakage/bottleneck_probe_auroc": 0.9042420521607472,
+      "leakage/soft_mask_excess_auroc": 0.013780286514951334,
+      "leakage/bottleneck_excess_auroc": 0.11003051649623019,
+      "uncertainty/seg_error_detection_auroc": 0.8859194374664631,
+      "uncertainty/mean_per_timestamp_std": 0.010412625037133694,
+      "uncertainty/boundary_std": 0.020156157513459522,
+      "uncertainty/interior_std": 0.009051558561623096,
+      "uncertainty/boundary_vs_interior": 2.2268162301813783,
+      "counterfactual/ablate_P_task_shift": 0.0039895745770384865,
+      "counterfactual/ablate_PQ_task_shift": 0.0016531367631008227,
+      "counterfactual/ablate_QRS_task_shift": 0.060848345359166466,
+      "counterfactual/ablate_ST_task_shift": 0.00532355501006047,
+      "counterfactual/ablate_T_task_shift": 0.0880861481030782,
+      "pathology/macro_ece": 0.031789792843335524,
+      "pathology/macro_brier": 0.09160789353177844,
+      "pathology/mc_macro_auroc": 0.9030005189102814,
+      "pathology/mc_ece": 0.02320544563227073,
+      "pathology/mc_brier": 0.09032342523467721,
+      "uncertainty/task_error_detection_auroc": 0.8055556211756413,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8099169870833949,
+      "uncertainty/task_mean_std": 0.02640555240213871
+    },
+    "dense_cem_s42": {
+      "seg/argmax_acc": 0.9614062784349409,
+      "seg/mean_kl": 0.031222991054767474,
+      "seg/mean_mae": 0.017611121312176996,
+      "seg/P/soft_dice": 0.727347673960144,
+      "seg/P/hard_dice": 0.9488758089811176,
+      "seg/P/mae": 0.02737477785202457,
+      "seg/PQ/soft_dice": 0.3551211879670941,
+      "seg/PQ/hard_dice": 0.8112632234005716,
+      "seg/PQ/mae": 0.006960644785331747,
+      "seg/QRS/soft_dice": 0.8487780604199041,
+      "seg/QRS/hard_dice": 0.9784695563014983,
+      "seg/QRS/mae": 0.008312146930503672,
+      "seg/ST/soft_dice": 0.5998818869173643,
+      "seg/ST/hard_dice": 0.9410596766332339,
+      "seg/ST/mae": 0.01063440781403282,
+      "seg/T/soft_dice": 0.7563830970506786,
+      "seg/T/hard_dice": 0.9684519637205827,
+      "seg/T/mae": 0.023764671457583954,
+      "seg/TP/soft_dice": 0.7707030264596847,
+      "seg/TP/hard_dice": 0.9684171620414818,
+      "seg/TP/mae": 0.02862007903358522,
+      "seg/macro_soft_dice": 0.6763691554624782,
+      "seg/macro_hard_dice": 0.9360895651797477,
+      "pathology/NORM/auroc": 0.9381718734891387,
+      "pathology/MI/auroc": 0.9150314430714915,
+      "pathology/STTC/auroc": 0.928345083583289,
+      "pathology/CD/auroc": 0.9218353170842652,
+      "pathology/HYP/auroc": 0.8061666062078101,
+      "pathology/macro_auroc": 0.9019100646871989,
+      "pathology/macro_auroc_ci95_lo": 0.8938336590167794,
+      "pathology/macro_auroc_ci95_hi": 0.9101619073781431,
+      "pathology/macro_auroc_boot_std": 0.0042442128687788,
+      "pathology/NORM/auroc_ci95_lo": 0.9294563443707532,
+      "pathology/NORM/auroc_ci95_hi": 0.9474734687978229,
+      "pathology/MI/auroc_ci95_lo": 0.9011772130058063,
+      "pathology/MI/auroc_ci95_hi": 0.9284559076639343,
+      "pathology/STTC/auroc_ci95_lo": 0.9166751941616071,
+      "pathology/STTC/auroc_ci95_hi": 0.9408745259078817,
+      "pathology/CD/auroc_ci95_lo": 0.9065343246026383,
+      "pathology/CD/auroc_ci95_hi": 0.9360433105287814,
+      "pathology/HYP/auroc_ci95_lo": 0.7769158821090267,
+      "pathology/HYP/auroc_ci95_hi": 0.8342089780671592,
+      "pathology/intervened_macro_auroc": 0.9020864600304641,
+      "pathology/intervention_gain": 0.0001763953432651899,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8089079456485543,
+      "leakage/bottleneck_probe_auroc": 0.9043374476692628,
+      "leakage/soft_mask_excess_auroc": 0.014696409984037317,
+      "leakage/bottleneck_excess_auroc": 0.11012591200474586,
+      "uncertainty/seg_error_detection_auroc": 0.8888808003197795,
+      "uncertainty/mean_per_timestamp_std": 0.010377857834100723,
+      "uncertainty/boundary_std": 0.02023291712005933,
+      "uncertainty/interior_std": 0.008990084752440453,
+      "uncertainty/boundary_vs_interior": 2.25058135459367,
+      "counterfactual/ablate_P_task_shift": 0.004582858644425869,
+      "counterfactual/ablate_PQ_task_shift": 0.002189834873812894,
+      "counterfactual/ablate_QRS_task_shift": 0.05487856393059095,
+      "counterfactual/ablate_ST_task_shift": 0.006620611374576886,
+      "counterfactual/ablate_T_task_shift": 0.09385302662849426,
+      "pathology/macro_ece": 0.02764596463601694,
+      "pathology/macro_brier": 0.0909038366026172,
+      "pathology/mc_macro_auroc": 0.9019593916377732,
+      "pathology/mc_ece": 0.026071694013310952,
+      "pathology/mc_brier": 0.09049040977837502,
+      "uncertainty/task_error_detection_auroc": 0.8087172572904018,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8111383708920447,
+      "uncertainty/task_mean_std": 0.024551667273044586
+    },
+    "dense_cem_s43": {
+      "seg/argmax_acc": 0.9568066424021838,
+      "seg/mean_kl": 0.03460144159596437,
+      "seg/mean_mae": 0.018656138898243788,
+      "seg/P/soft_dice": 0.7257544123002208,
+      "seg/P/hard_dice": 0.9403737306976623,
+      "seg/P/mae": 0.029910735722993916,
+      "seg/PQ/soft_dice": 0.36485536974164434,
+      "seg/PQ/hard_dice": 0.7729149699262304,
+      "seg/PQ/mae": 0.007923978991243816,
+      "seg/QRS/soft_dice": 0.8504426294959634,
+      "seg/QRS/hard_dice": 0.97721100484122,
+      "seg/QRS/mae": 0.008426644725296256,
+      "seg/ST/soft_dice": 0.5962432528630698,
+      "seg/ST/hard_dice": 0.9372272150267861,
+      "seg/ST/mae": 0.010802328524533134,
+      "seg/T/soft_dice": 0.7570324546554035,
+      "seg/T/hard_dice": 0.9649841288716413,
+      "seg/T/mae": 0.024982324240964797,
+      "seg/TP/soft_dice": 0.7814344086759275,
+      "seg/TP/hard_dice": 0.9656504446448367,
+      "seg/TP/mae": 0.029890821184430802,
+      "seg/macro_soft_dice": 0.6792937546220382,
+      "seg/macro_hard_dice": 0.9263935823347295,
+      "pathology/NORM/auroc": 0.9390240518622222,
+      "pathology/MI/auroc": 0.9188912180052957,
+      "pathology/STTC/auroc": 0.9200731879385904,
+      "pathology/CD/auroc": 0.9129605587354535,
+      "pathology/HYP/auroc": 0.8196279020251089,
+      "pathology/macro_auroc": 0.902115383713334,
+      "pathology/macro_auroc_ci95_lo": 0.8942294605173386,
+      "pathology/macro_auroc_ci95_hi": 0.9097405622878763,
+      "pathology/macro_auroc_boot_std": 0.0041513217825517165,
+      "pathology/NORM/auroc_ci95_lo": 0.9305793983046498,
+      "pathology/NORM/auroc_ci95_hi": 0.9477165244324148,
+      "pathology/MI/auroc_ci95_lo": 0.9057204084936042,
+      "pathology/MI/auroc_ci95_hi": 0.9306060186758949,
+      "pathology/STTC/auroc_ci95_lo": 0.9081975199784504,
+      "pathology/STTC/auroc_ci95_hi": 0.9326413372486276,
+      "pathology/CD/auroc_ci95_lo": 0.8980421253076992,
+      "pathology/CD/auroc_ci95_hi": 0.9284318233648302,
+      "pathology/HYP/auroc_ci95_lo": 0.7927729787172858,
+      "pathology/HYP/auroc_ci95_hi": 0.8450768472677063,
+      "pathology/intervened_macro_auroc": 0.9028403427399201,
+      "pathology/intervention_gain": 0.0007249590265860917,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8102033284579093,
+      "leakage/bottleneck_probe_auroc": 0.8998511695836477,
+      "leakage/soft_mask_excess_auroc": 0.015991792793392356,
+      "leakage/bottleneck_excess_auroc": 0.10563963391913078,
+      "uncertainty/seg_error_detection_auroc": 0.88275672538299,
+      "uncertainty/mean_per_timestamp_std": 0.011151614598929882,
+      "uncertainty/boundary_std": 0.021234933907787006,
+      "uncertainty/interior_std": 0.009782623499631882,
+      "uncertainty/boundary_vs_interior": 2.170678847917031,
+      "counterfactual/ablate_P_task_shift": 0.014186276743809382,
+      "counterfactual/ablate_PQ_task_shift": 0.004267137032002211,
+      "counterfactual/ablate_QRS_task_shift": 0.07236496234933536,
+      "counterfactual/ablate_ST_task_shift": 0.039861973375082016,
+      "counterfactual/ablate_T_task_shift": 0.09670528769493103,
+      "pathology/macro_ece": 0.07033457333945078,
+      "pathology/macro_brier": 0.10094896173912797,
+      "pathology/mc_macro_auroc": 0.903271357330944,
+      "pathology/mc_ece": 0.058164992981723375,
+      "pathology/mc_brier": 0.09768390113492555,
+      "uncertainty/task_error_detection_auroc": 0.8010540635153014,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7935932072781803,
+      "uncertainty/task_mean_std": 0.024508455768227577
+    },
+    "dense_cem_s44": {
+      "seg/argmax_acc": 0.9580250227479526,
+      "seg/mean_kl": 0.03223056352388002,
+      "seg/mean_mae": 0.017976823366516317,
+      "seg/P/soft_dice": 0.7212352717743282,
+      "seg/P/hard_dice": 0.9442681409944804,
+      "seg/P/mae": 0.028748439493778078,
+      "seg/PQ/soft_dice": 0.3531783891576871,
+      "seg/PQ/hard_dice": 0.7691147724131652,
+      "seg/PQ/mae": 0.008192284602268486,
+      "seg/QRS/soft_dice": 0.8465818233319864,
+      "seg/QRS/hard_dice": 0.9778826928860738,
+      "seg/QRS/mae": 0.008201124050706164,
+      "seg/ST/soft_dice": 0.5926130570074719,
+      "seg/ST/hard_dice": 0.9377402822033951,
+      "seg/ST/mae": 0.010854854927375384,
+      "seg/T/soft_dice": 0.7593746122614314,
+      "seg/T/hard_dice": 0.9655873900918663,
+      "seg/T/mae": 0.023772864830287833,
+      "seg/TP/soft_dice": 0.7753022316752594,
+      "seg/TP/hard_dice": 0.9668530440916655,
+      "seg/TP/mae": 0.028091372294681956,
+      "seg/macro_soft_dice": 0.6747142308680273,
+      "seg/macro_hard_dice": 0.9269077204467745,
+      "pathology/NORM/auroc": 0.9378292364027729,
+      "pathology/MI/auroc": 0.9014061120917917,
+      "pathology/STTC/auroc": 0.9259816013978825,
+      "pathology/CD/auroc": 0.9188585061218302,
+      "pathology/HYP/auroc": 0.8154798987445587,
+      "pathology/macro_auroc": 0.8999110709517671,
+      "pathology/macro_auroc_ci95_lo": 0.8922343399183654,
+      "pathology/macro_auroc_ci95_hi": 0.9080504343340934,
+      "pathology/macro_auroc_boot_std": 0.004229806941886714,
+      "pathology/NORM/auroc_ci95_lo": 0.9289275888964719,
+      "pathology/NORM/auroc_ci95_hi": 0.9469837875262165,
+      "pathology/MI/auroc_ci95_lo": 0.8864590229726446,
+      "pathology/MI/auroc_ci95_hi": 0.9145578711263682,
+      "pathology/STTC/auroc_ci95_lo": 0.9138805306118972,
+      "pathology/STTC/auroc_ci95_hi": 0.938006495287948,
+      "pathology/CD/auroc_ci95_lo": 0.9038251416395988,
+      "pathology/CD/auroc_ci95_hi": 0.9329793953593597,
+      "pathology/HYP/auroc_ci95_lo": 0.787887231519928,
+      "pathology/HYP/auroc_ci95_hi": 0.8426107535051033,
+      "pathology/intervened_macro_auroc": 0.8999605108564129,
+      "pathology/intervention_gain": 4.943990464578718e-05,
+      "leakage/gt_mask_probe_auroc": 0.794211535664517,
+      "leakage/pred_mask_probe_auroc": 0.8035773693568202,
+      "leakage/bottleneck_probe_auroc": 0.9054480514084908,
+      "leakage/soft_mask_excess_auroc": 0.00936583369230326,
+      "leakage/bottleneck_excess_auroc": 0.11123651574397386,
+      "uncertainty/seg_error_detection_auroc": 0.8934606055431351,
+      "uncertainty/mean_per_timestamp_std": 0.010117186233401299,
+      "uncertainty/boundary_std": 0.019796794280409813,
+      "uncertainty/interior_std": 0.008746383401254812,
+      "uncertainty/boundary_vs_interior": 2.263426306874409,
+      "counterfactual/ablate_P_task_shift": 0.012481605634093285,
+      "counterfactual/ablate_PQ_task_shift": 0.006816295286019643,
+      "counterfactual/ablate_QRS_task_shift": 0.052761478970448174,
+      "counterfactual/ablate_ST_task_shift": 0.008725630895545086,
+      "counterfactual/ablate_T_task_shift": 0.06601311018069585,
+      "pathology/macro_ece": 0.061030567154214066,
+      "pathology/macro_brier": 0.10014345907067827,
+      "pathology/mc_macro_auroc": 0.897836210346729,
+      "pathology/mc_ece": 0.0701572220860637,
+      "pathology/mc_brier": 0.10380666042674958,
+      "uncertainty/task_error_detection_auroc": 0.793144587400122,
+      "uncertainty/task_error_detection_auroc_pooled": 0.7784140387738258,
+      "uncertainty/task_mean_std": 0.02009880170226097
+    },
+    "dense_cem_softseg": {
+      "seg/argmax_acc": 0.9589636032757052,
+      "seg/mean_kl": 0.032041514902574786,
+      "seg/mean_mae": 0.018860003225218358,
+      "seg/P/soft_dice": 0.7234991988179102,
+      "seg/P/hard_dice": 0.946303609617919,
+      "seg/P/mae": 0.02790596781653421,
+      "seg/PQ/soft_dice": 0.3754112776820945,
+      "seg/PQ/hard_dice": 0.7783622184962087,
+      "seg/PQ/mae": 0.007843824759735857,
+      "seg/QRS/soft_dice": 0.8505816685257077,
+      "seg/QRS/hard_dice": 0.9775623511226711,
+      "seg/QRS/mae": 0.00804433138485493,
+      "seg/ST/soft_dice": 0.5962403542324438,
+      "seg/ST/hard_dice": 0.9351214957989071,
+      "seg/ST/mae": 0.010837219668692952,
+      "seg/T/soft_dice": 0.7451462349947492,
+      "seg/T/hard_dice": 0.9659705654752656,
+      "seg/T/mae": 0.027189873262358537,
+      "seg/TP/soft_dice": 0.7629272655967537,
+      "seg/TP/hard_dice": 0.968678133641212,
+      "seg/TP/mae": 0.03133880245913366,
+      "seg/macro_soft_dice": 0.6756343333082765,
+      "seg/macro_hard_dice": 0.9286663956920306,
+      "pathology/NORM/auroc": 0.94274765514313,
+      "pathology/MI/auroc": 0.9176737643424537,
+      "pathology/STTC/auroc": 0.9267869490464309,
+      "pathology/CD/auroc": 0.923146630150487,
+      "pathology/HYP/auroc": 0.8135813592202386,
+      "pathology/macro_auroc": 0.9047872715805478,
+      "pathology/intervened_macro_auroc": 0.9050219293836111,
+      "pathology/intervention_gain": 0.00023465780306330952,
+      "uncertainty/seg_error_detection_auroc": 0.8902256955971265,
+      "uncertainty/mean_per_timestamp_std": 0.010410791262984276,
+      "uncertainty/boundary_std": 0.019780746350685757,
+      "uncertainty/interior_std": 0.009081617618600527,
+      "uncertainty/boundary_vs_interior": 2.1781082601597093,
+      "counterfactual/ablate_P_task_shift": 0.01781270032127698,
+      "counterfactual/ablate_PQ_task_shift": 0.003588349170361956,
+      "counterfactual/ablate_QRS_task_shift": 0.015144286366800467,
+      "counterfactual/ablate_ST_task_shift": 0.010113760518531004,
+      "counterfactual/ablate_T_task_shift": 0.037742242217063904,
+      "pathology/macro_ece": 0.036660235663095245,
+      "pathology/macro_brier": 0.0912911953998685,
+      "pathology/mc_macro_auroc": 0.9042006419684607,
+      "pathology/mc_ece": 0.04046673032372945,
+      "pathology/mc_brier": 0.0924111247332106,
+      "uncertainty/task_error_detection_auroc": 0.804187040099421,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8024118289442442,
+      "uncertainty/task_mean_std": 0.020944058895111084
+    },
+    "dense_multitask_s42": {
+      "seg/argmax_acc": 0.9638876251137397,
+      "seg/mean_kl": 0.028853923016618446,
+      "seg/mean_mae": 0.01579663054813643,
+      "seg/P/soft_dice": 0.743198850413096,
+      "seg/P/hard_dice": 0.9511085334918202,
+      "seg/P/mae": 0.024709196109789083,
+      "seg/PQ/soft_dice": 0.37928885534396806,
+      "seg/PQ/hard_dice": 0.806212845322791,
+      "seg/PQ/mae": 0.007327563784792816,
+      "seg/QRS/soft_dice": 0.855031733926692,
+      "seg/QRS/hard_dice": 0.9801553822342567,
+      "seg/QRS/mae": 0.007825003980614035,
+      "seg/ST/soft_dice": 0.6159522785455388,
+      "seg/ST/hard_dice": 0.9470252648738097,
+      "seg/ST/mae": 0.010383304738260813,
+      "seg/T/soft_dice": 0.7719633356271092,
+      "seg/T/hard_dice": 0.9711245528823542,
+      "seg/T/mae": 0.020791730275036967,
+      "seg/TP/soft_dice": 0.7900102571884463,
+      "seg/TP/hard_dice": 0.971166926368403,
+      "seg/TP/mae": 0.02374298440032487,
+      "seg/macro_soft_dice": 0.6925742185074751,
+      "seg/macro_hard_dice": 0.9377989175289058,
+      "pathology/NORM/auroc": 0.9446786148212611,
+      "pathology/MI/auroc": 0.9285668578993822,
+      "pathology/STTC/auroc": 0.9303482325568356,
+      "pathology/CD/auroc": 0.9308125402751979,
+      "pathology/HYP/auroc": 0.8373752050343828,
+      "pathology/macro_auroc": 0.9143562901174119,
+      "pathology/macro_auroc_ci95_lo": 0.9069677238897272,
+      "pathology/macro_auroc_ci95_hi": 0.9217537656072359,
+      "pathology/macro_auroc_boot_std": 0.003950675658427708,
+      "pathology/NORM/auroc_ci95_lo": 0.9367196737003076,
+      "pathology/NORM/auroc_ci95_hi": 0.9527947918664926,
+      "pathology/MI/auroc_ci95_lo": 0.9163490718630072,
+      "pathology/MI/auroc_ci95_hi": 0.9395264191574457,
+      "pathology/STTC/auroc_ci95_lo": 0.9189183183774211,
+      "pathology/STTC/auroc_ci95_hi": 0.9419251263834904,
+      "pathology/CD/auroc_ci95_lo": 0.9169437615962364,
+      "pathology/CD/auroc_ci95_hi": 0.942818305536238,
+      "pathology/HYP/auroc_ci95_lo": 0.8123618651942973,
+      "pathology/HYP/auroc_ci95_hi": 0.8609043699110221,
+      "uncertainty/seg_error_detection_auroc": 0.8481328096166659,
+      "uncertainty/mean_per_timestamp_std": 0.01194864884018898,
+      "uncertainty/boundary_std": 0.02004402255018552,
+      "uncertainty/interior_std": 0.010819775673250357,
+      "uncertainty/boundary_vs_interior": 1.8525358709367878,
+      "pathology/macro_ece": 0.05418290010378294,
+      "pathology/macro_brier": 0.09147945925496803,
+      "pathology/mc_macro_auroc": 0.9144865993011873,
+      "pathology/mc_ece": 0.04747487221598972,
+      "pathology/mc_brier": 0.0896086559531362,
+      "uncertainty/task_error_detection_auroc": 0.8281412921752798,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8286693757471555,
+      "uncertainty/task_mean_std": 0.022506479173898697
+    },
+    "dense_multitask_s43": {
+      "seg/argmax_acc": 0.9641874431301183,
+      "seg/mean_kl": 0.029696073801111805,
+      "seg/mean_mae": 0.016153752091800873,
+      "seg/P/soft_dice": 0.7420009951918349,
+      "seg/P/hard_dice": 0.9511464423062705,
+      "seg/P/mae": 0.02503498489060545,
+      "seg/PQ/soft_dice": 0.3736554997993244,
+      "seg/PQ/hard_dice": 0.8223947090460295,
+      "seg/PQ/mae": 0.007112116736428536,
+      "seg/QRS/soft_dice": 0.8555113967436137,
+      "seg/QRS/hard_dice": 0.9813605355667061,
+      "seg/QRS/mae": 0.007908440087468544,
+      "seg/ST/soft_dice": 0.6165405194938222,
+      "seg/ST/hard_dice": 0.9465325837681222,
+      "seg/ST/mae": 0.010723943305948412,
+      "seg/T/soft_dice": 0.7746321916911207,
+      "seg/T/hard_dice": 0.9706208607003559,
+      "seg/T/mae": 0.021638802498009556,
+      "seg/TP/soft_dice": 0.7914693034196637,
+      "seg/TP/hard_dice": 0.9708167179713877,
+      "seg/TP/mae": 0.024504225032344746,
+      "seg/macro_soft_dice": 0.6923016510565633,
+      "seg/macro_hard_dice": 0.940478641559812,
+      "pathology/NORM/auroc": 0.945520703267875,
+      "pathology/MI/auroc": 0.928122241835834,
+      "pathology/STTC/auroc": 0.9337541698203122,
+      "pathology/CD/auroc": 0.9296202759561807,
+      "pathology/HYP/auroc": 0.8489931628919312,
+      "pathology/macro_auroc": 0.9172021107544266,
+      "pathology/macro_auroc_ci95_lo": 0.9099879727240645,
+      "pathology/macro_auroc_ci95_hi": 0.9244442785038637,
+      "pathology/macro_auroc_boot_std": 0.00388258862677407,
+      "pathology/NORM/auroc_ci95_lo": 0.9376496930715433,
+      "pathology/NORM/auroc_ci95_hi": 0.9540524686108552,
+      "pathology/MI/auroc_ci95_lo": 0.9149006040191875,
+      "pathology/MI/auroc_ci95_hi": 0.9395490304543144,
+      "pathology/STTC/auroc_ci95_lo": 0.9229352300190042,
+      "pathology/STTC/auroc_ci95_hi": 0.9450853953520331,
+      "pathology/CD/auroc_ci95_lo": 0.9144504966935181,
+      "pathology/CD/auroc_ci95_hi": 0.942598690669694,
+      "pathology/HYP/auroc_ci95_lo": 0.8237588752399463,
+      "pathology/HYP/auroc_ci95_hi": 0.8722266108070421,
+      "uncertainty/seg_error_detection_auroc": 0.8510040065672271,
+      "uncertainty/mean_per_timestamp_std": 0.011912597343325615,
+      "uncertainty/boundary_std": 0.02032535895705223,
+      "uncertainty/interior_std": 0.01074418518692255,
+      "uncertainty/boundary_vs_interior": 1.8917543399932788,
+      "pathology/macro_ece": 0.034915357044664426,
+      "pathology/macro_brier": 0.08601494578647935,
+      "pathology/mc_macro_auroc": 0.9170720111316599,
+      "pathology/mc_ece": 0.0314916562925775,
+      "pathology/mc_brier": 0.0852552515533802,
+      "uncertainty/task_error_detection_auroc": 0.8195607269137042,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8218266087132828,
+      "uncertainty/task_mean_std": 0.02157115377485752
+    },
+    "dense_multitask_s44": {
+      "seg/argmax_acc": 0.9632024567788899,
+      "seg/mean_kl": 0.029193419771480822,
+      "seg/mean_mae": 0.01591306037659858,
+      "seg/P/soft_dice": 0.7418458093003569,
+      "seg/P/hard_dice": 0.9511219494871751,
+      "seg/P/mae": 0.024429501728755545,
+      "seg/PQ/soft_dice": 0.37517467093967916,
+      "seg/PQ/hard_dice": 0.7959643537325954,
+      "seg/PQ/mae": 0.0072698177375828165,
+      "seg/QRS/soft_dice": 0.8549608093848766,
+      "seg/QRS/hard_dice": 0.9787697415282038,
+      "seg/QRS/mae": 0.007945055863551383,
+      "seg/ST/soft_dice": 0.6162012045880861,
+      "seg/ST/hard_dice": 0.9466337323454389,
+      "seg/ST/mae": 0.010491890904684302,
+      "seg/T/soft_dice": 0.7715790807987752,
+      "seg/T/hard_dice": 0.9703442301458073,
+      "seg/T/mae": 0.021162476613371888,
+      "seg/TP/soft_dice": 0.7913441827953905,
+      "seg/TP/hard_dice": 0.970843279358227,
+      "seg/TP/mae": 0.02417961941164553,
+      "seg/macro_soft_dice": 0.6918509596345275,
+      "seg/macro_hard_dice": 0.9356128810995745,
+      "pathology/NORM/auroc": 0.9422448404740584,
+      "pathology/MI/auroc": 0.9227736098852604,
+      "pathology/STTC/auroc": 0.9355704360907875,
+      "pathology/CD/auroc": 0.9317246550547741,
+      "pathology/HYP/auroc": 0.8414837786259541,
+      "pathology/macro_auroc": 0.9147594640261669,
+      "pathology/macro_auroc_ci95_lo": 0.907158697122686,
+      "pathology/macro_auroc_ci95_hi": 0.9225486320857824,
+      "pathology/macro_auroc_boot_std": 0.004051611233414982,
+      "pathology/NORM/auroc_ci95_lo": 0.933661456592799,
+      "pathology/NORM/auroc_ci95_hi": 0.950736780748928,
+      "pathology/MI/auroc_ci95_lo": 0.9103703812183793,
+      "pathology/MI/auroc_ci95_hi": 0.9347596008464399,
+      "pathology/STTC/auroc_ci95_lo": 0.925077688258893,
+      "pathology/STTC/auroc_ci95_hi": 0.9461565118403642,
+      "pathology/CD/auroc_ci95_lo": 0.9179955774892757,
+      "pathology/CD/auroc_ci95_hi": 0.9440651910398736,
+      "pathology/HYP/auroc_ci95_lo": 0.8169639720705407,
+      "pathology/HYP/auroc_ci95_hi": 0.8646351725802057,
+      "uncertainty/seg_error_detection_auroc": 0.8533294535419367,
+      "uncertainty/mean_per_timestamp_std": 0.012047749944031239,
+      "uncertainty/boundary_std": 0.020123640075325966,
+      "uncertainty/interior_std": 0.01095338569333156,
+      "uncertainty/boundary_vs_interior": 1.8372072926800407,
+      "pathology/macro_ece": 0.0406077113693694,
+      "pathology/macro_brier": 0.08933890685548067,
+      "pathology/mc_macro_auroc": 0.9146603836986248,
+      "pathology/mc_ece": 0.03742568787305766,
+      "pathology/mc_brier": 0.08873704474653361,
+      "uncertainty/task_error_detection_auroc": 0.8203041778785053,
+      "uncertainty/task_error_detection_auroc_pooled": 0.8231690706111272,
+      "uncertainty/task_mean_std": 0.02235046774148941
+    }
+  },
+  "dense_multiseed": {
+    "dense_blackbox": {
+      "n_seeds": 3,
+      "pathology/CD/auroc": {
+        "mean": 0.9225616526414212,
+        "std": 0.001424672600339393
+      },
+      "pathology/CD/auroc_ci95_hi": {
+        "mean": 0.9362036888190902,
+        "std": 0.001409871789376394
+      },
+      "pathology/CD/auroc_ci95_lo": {
+        "mean": 0.907129586556898,
+        "std": 0.0013981569109754988
+      },
+      "pathology/HYP/auroc": {
+        "mean": 0.8411880559586146,
+        "std": 0.0058970547887076
+      },
+      "pathology/HYP/auroc_ci95_hi": {
+        "mean": 0.8643952776327043,
+        "std": 0.005763115826642178
+      },
+      "pathology/HYP/auroc_ci95_lo": {
+        "mean": 0.8157705805967596,
+        "std": 0.006436722971022745
+      },
+      "pathology/MI/auroc": {
+        "mean": 0.9235583995292734,
+        "std": 0.002671056894152674
+      },
+      "pathology/MI/auroc_ci95_hi": {
+        "mean": 0.9357167250094148,
+        "std": 0.0021269521926170626
+      },
+      "pathology/MI/auroc_ci95_lo": {
+        "mean": 0.9106494298768378,
+        "std": 0.0023589398014892625
+      },
+      "pathology/NORM/auroc": {
+        "mean": 0.9448357093708791,
+        "std": 0.00043270391424234307
+      },
+      "pathology/NORM/auroc_ci95_hi": {
+        "mean": 0.9530854748864148,
+        "std": 0.00032051726454701535
+      },
+      "pathology/NORM/auroc_ci95_lo": {
+        "mean": 0.936756645776378,
+        "std": 0.0006841436106971729
+      },
+      "pathology/STTC/auroc": {
+        "mean": 0.9326597379904502,
+        "std": 0.0006565782334263349
+      },
+      "pathology/STTC/auroc_ci95_hi": {
+        "mean": 0.9436768542656266,
+        "std": 0.0004385946148259207
+      },
+      "pathology/STTC/auroc_ci95_lo": {
+        "mean": 0.921947165894572,
+        "std": 0.0009634007263267444
+      },
+      "pathology/macro_auroc": {
+        "mean": 0.9129607110981276,
+        "std": 0.0010251624361373281
+      },
+      "pathology/macro_auroc_boot_std": {
+        "mean": 0.004002954168929609,
+        "std": 0.0001327864025523282
+      },
+      "pathology/macro_auroc_ci95_hi": {
+        "mean": 0.9206468124127932,
+        "std": 0.0011053155085477987
+      },
+      "pathology/macro_auroc_ci95_lo": {
+        "mean": 0.9054655358371889,
+        "std": 0.0009178999330293472
+      },
+      "pathology/macro_brier": {
+        "mean": 0.08766487911662257,
+        "std": 0.0004975442638398367
+      },
+      "pathology/macro_ece": {
+        "mean": 0.03895303202884031,
+        "std": 0.00377098556820871
+      },
+      "pathology/mc_brier": {
+        "mean": 0.0874095090522483,
+        "std": 0.0004894451374659916
+      },
+      "pathology/mc_ece": {
+        "mean": 0.037227295178960305,
+        "std": 0.004009046900975846
+      },
+      "pathology/mc_macro_auroc": {
+        "mean": 0.9129080824095466,
+        "std": 0.0009153092650843131
+      },
+      "uncertainty/task_error_detection_auroc": {
+        "mean": 0.813612685576623,
+        "std": 0.0020278556556255246
+      },
+      "uncertainty/task_error_detection_auroc_pooled": {
+        "mean": 0.8157705536287668,
+        "std": 0.002454541183535891
+      },
+      "uncertainty/task_mean_std": {
+        "mean": 0.018503699451684952,
+        "std": 0.0003322146318399268
+      }
+    },
+    "dense_cbm_detached": {
+      "n_seeds": 3,
+      "counterfactual/ablate_PQ_task_shift": {
+        "mean": 0.09560864004823898,
+        "std": 0.01604935929596319
+      },
+      "counterfactual/ablate_P_task_shift": {
+        "mean": 0.17870488597287074,
+        "std": 0.012165740702688553
+      },
+      "counterfactual/ablate_QRS_task_shift": {
+        "mean": 0.24527113139629364,
+        "std": 0.06077685508170762
+      },
+      "counterfactual/ablate_ST_task_shift": {
+        "mean": 0.20080972214539847,
+        "std": 0.001101683705107415
+      },
+      "counterfactual/ablate_T_task_shift": {
+        "mean": 0.18876936535040537,
+        "std": 0.010982762025820512
+      },
+      "leakage/bottleneck_excess_auroc": {
+        "mean": -0.0022201337644176164,
+        "std": 0.00019515326952493882
+      },
+      "leakage/bottleneck_probe_auroc": {
+        "mean": 0.7919914019000993,
+        "std": 0.00019515326952493882
+      },
+      "leakage/gt_mask_probe_auroc": {
+        "mean": 0.794211535664517,
+        "std": 0.0
+      },
+      "leakage/pred_mask_probe_auroc": {
+        "mean": 0.7919914019000993,
+        "std": 0.00019515326952493882
+      },
+      "leakage/soft_mask_excess_auroc": {
+        "mean": -0.0022201337644176164,
+        "std": 0.00019515326952493882
+      },
+      "pathology/CD/auroc": {
+        "mean": 0.8629486341179889,
+        "std": 0.002620765717675518
+      },
+      "pathology/CD/auroc_ci95_hi": {
+        "mean": 0.8819794394997325,
+        "std": 0.002494071532565529
+      },
+      "pathology/CD/auroc_ci95_lo": {
+        "mean": 0.8442177743227434,
+        "std": 0.0025920958610546213
+      },
+      "pathology/HYP/auroc": {
+        "mean": 0.787235755367695,
+        "std": 0.004110811280838282
+      },
+      "pathology/HYP/auroc_ci95_hi": {
+        "mean": 0.8173236958795854,
+        "std": 0.003864499920479285
+      },
+      "pathology/HYP/auroc_ci95_lo": {
+        "mean": 0.7584351629050431,
+        "std": 0.004450369119519397
+      },
+      "pathology/MI/auroc": {
+        "mean": 0.8469481832892027,
+        "std": 0.0003715992737056154
+      },
+      "pathology/MI/auroc_ci95_hi": {
+        "mean": 0.8644928545873328,
+        "std": 0.000558787671740619
+      },
+      "pathology/MI/auroc_ci95_lo": {
+        "mean": 0.8280724305240018,
+        "std": 0.00036682017932723943
+      },
+      "pathology/NORM/auroc": {
+        "mean": 0.9169734985278518,
+        "std": 0.0007128633434311774
+      },
+      "pathology/NORM/auroc_ci95_hi": {
+        "mean": 0.9278215003622009,
+        "std": 0.0007787707818158734
+      },
+      "pathology/NORM/auroc_ci95_lo": {
+        "mean": 0.906487860189447,
+        "std": 0.0005030552984132408
+      },
+      "pathology/STTC/auroc": {
+        "mean": 0.9148871929283585,
+        "std": 0.000388982507735943
+      },
+      "pathology/STTC/auroc_ci95_hi": {
+        "mean": 0.9287725994430319,
+        "std": 0.0005082300227168613
+      },
+      "pathology/STTC/auroc_ci95_lo": {
+        "mean": 0.9017870370969492,
+        "std": 0.0005993341105537828
+      },
+      "pathology/intervened_macro_auroc": {
+        "mean": 0.8668898870392304,
+        "std": 0.0014083677645158577
+      },
+      "pathology/intervention_gain": {
+        "mean": 0.0010912341930110852,
+        "std": 0.001053853822761752
+      },
+      "pathology/macro_auroc": {
+        "mean": 0.8657986528462193,
+        "std": 0.0005458354700781191
+      },
+      "pathology/macro_auroc_boot_std": {
+        "mean": 0.0048997435029346165,
+        "std": 5.674960731292305e-05
+      },
+      "pathology/macro_auroc_ci95_hi": {
+        "mean": 0.8761567730532437,
+        "std": 0.0005216384125411725
+      },
+      "pathology/macro_auroc_ci95_lo": {
+        "mean": 0.8563220662817143,
+        "std": 0.0008411614192953696
+      },
+      "pathology/macro_brier": {
+        "mean": 0.10938617201115924,
+        "std": 0.0008327880159373353
+      },
+      "pathology/macro_ece": {
+        "mean": 0.04346868457632972,
+        "std": 0.004914741872427701
+      },
+      "pathology/mc_brier": {
+        "mean": 0.1065697704279544,
+        "std": 0.0004025012313849815
+      },
+      "pathology/mc_ece": {
+        "mean": 0.026429750247708897,
+        "std": 0.00249634231213987
+      },
+      "pathology/mc_macro_auroc": {
+        "mean": 0.8671182757031785,
+        "std": 0.00044910702458572665
+      },
+      "seg/P/hard_dice": {
+        "mean": 0.9588527305352471,
+        "std": 0.0007422143290257839
+      },
+      "seg/P/mae": {
+        "mean": 0.021088421345769475,
+        "std": 0.0001976146052083845
+      },
+      "seg/P/soft_dice": {
+        "mean": 0.743918832529808,
+        "std": 0.0002441808362461508
+      },
+      "seg/PQ/hard_dice": {
+        "mean": 0.829111486034431,
+        "std": 0.0064568535366316395
+      },
+      "seg/PQ/mae": {
+        "mean": 0.00628110285010669,
+        "std": 0.00013790588310502884
+      },
+      "seg/PQ/soft_dice": {
+        "mean": 0.3793776338465045,
+        "std": 0.0013798315346330227
+      },
+      "seg/QRS/hard_dice": {
+        "mean": 0.9838673156398542,
+        "std": 0.00022551145367807134
+      },
+      "seg/QRS/mae": {
+        "mean": 0.006412356602556242,
+        "std": 9.062051302347655e-05
+      },
+      "seg/QRS/soft_dice": {
+        "mean": 0.8550494077057754,
+        "std": 0.00022109160683217704
+      },
+      "seg/ST/hard_dice": {
+        "mean": 0.9592791362206193,
+        "std": 0.0004971331855105788
+      },
+      "seg/ST/mae": {
+        "mean": 0.008567743113375737,
+        "std": 4.16383412115075e-05
+      },
+      "seg/ST/soft_dice": {
+        "mean": 0.6153696443850825,
+        "std": 6.639214696983977e-05
+      },
+      "seg/T/hard_dice": {
+        "mean": 0.9763269730436027,
+        "std": 8.391636218298539e-05
+      },
+      "seg/T/mae": {
+        "mean": 0.017811119521571755,
+        "std": 0.00016924837448709673
+      },
+      "seg/T/soft_dice": {
+        "mean": 0.7732173292188619,
+        "std": 0.0006696105184521635
+      },
+      "seg/TP/hard_dice": {
+        "mean": 0.9757354018843611,
+        "std": 0.00013715047356262648
+      },
+      "seg/TP/mae": {
+        "mean": 0.02043969863090943,
+        "std": 0.00017426180445708644
+      },
+      "seg/TP/soft_dice": {
+        "mean": 0.7909775093194189,
+        "std": 0.0007292818884236545
+      },
+      "seg/argmax_acc": {
+        "mean": 0.9701053988474371,
+        "std": 0.00026091984364400825
+      },
+      "seg/macro_hard_dice": {
+        "mean": 0.9471955072263524,
+        "std": 0.0011469128011600874
+      },
+      "seg/macro_soft_dice": {
+        "mean": 0.6929850595009085,
+        "std": 0.0004699246410110615
+      },
+      "seg/mean_kl": {
+        "mean": 0.02225263399466045,
+        "std": 0.00031793468358377874
+      },
+      "seg/mean_mae": {
+        "mean": 0.013433407010714889,
+        "std": 0.0001340559481384156
+      },
+      "uncertainty/boundary_std": {
+        "mean": 0.018258919732438195,
+        "std": 5.208630598007034e-05
+      },
+      "uncertainty/boundary_vs_interior": {
+        "mean": 1.7841089497002385,
+        "std": 0.0062296582460725815
+      },
+      "uncertainty/interior_std": {
+        "mean": 0.01023421436548233,
+        "std": 1.2526077723208488e-05
+      },
+      "uncertainty/mean_per_timestamp_std": {
+        "mean": 0.011187468034525713,
+        "std": 7.639481511139408e-06
+      },
+      "uncertainty/seg_error_detection_auroc": {
+        "mean": 0.8489662350578456,
+        "std": 0.0037486160328023092
+      },
+      "uncertainty/task_error_detection_auroc": {
+        "mean": 0.7754444782195837,
+        "std": 0.003271027543031145
+      },
+      "uncertainty/task_error_detection_auroc_pooled": {
+        "mean": 0.7794396029206125,
+        "std": 0.003851696807809347
+      },
+      "uncertainty/task_mean_std": {
+        "mean": 0.02683457297583421,
+        "std": 0.001041206868762604
+      }
+    },
+    "dense_cbm_joint": {
+      "n_seeds": 3,
+      "counterfactual/ablate_PQ_task_shift": {
+        "mean": 0.06963057526283793,
+        "std": 0.005671558315302296
+      },
+      "counterfactual/ablate_P_task_shift": {
+        "mean": 0.16292785356442133,
+        "std": 0.02254067194116879
+      },
+      "counterfactual/ablate_QRS_task_shift": {
+        "mean": 0.27393069201045567,
+        "std": 0.06449690234219367
+      },
+      "counterfactual/ablate_ST_task_shift": {
+        "mean": 0.218353400627772,
+        "std": 0.051107208200201745
+      },
+      "counterfactual/ablate_T_task_shift": {
+        "mean": 0.15533588412735197,
+        "std": 0.03761447535512697
+      },
+      "leakage/bottleneck_excess_auroc": {
+        "mean": 0.07528520565824719,
+        "std": 0.0049227465715764905
+      },
+      "leakage/bottleneck_probe_auroc": {
+        "mean": 0.8694967413227642,
+        "std": 0.0049227465715764905
+      },
+      "leakage/gt_mask_probe_auroc": {
+        "mean": 0.794211535664517,
+        "std": 0.0
+      },
+      "leakage/pred_mask_probe_auroc": {
+        "mean": 0.8694967413227642,
+        "std": 0.0049227465715764905
+      },
+      "leakage/soft_mask_excess_auroc": {
+        "mean": 0.07528520565824719,
+        "std": 0.0049227465715764905
+      },
+      "pathology/CD/auroc": {
+        "mean": 0.9270983378188848,
+        "std": 0.004257170146884959
+      },
+      "pathology/CD/auroc_ci95_hi": {
+        "mean": 0.9403907782216919,
+        "std": 0.0033532997525273435
+      },
+      "pathology/CD/auroc_ci95_lo": {
+        "mean": 0.9123567604528112,
+        "std": 0.004685283095239868
+      },
+      "pathology/HYP/auroc": {
+        "mean": 0.8203409222341387,
+        "std": 0.006042048272212055
+      },
+      "pathology/HYP/auroc_ci95_hi": {
+        "mean": 0.8460658454701248,
+        "std": 0.0056859018880094266
+      },
+      "pathology/HYP/auroc_ci95_lo": {
+        "mean": 0.7927674012981053,
+        "std": 0.005334980826646851
+      },
+      "pathology/MI/auroc": {
+        "mean": 0.9243003456899088,
+        "std": 0.0037251151477769306
+      },
+      "pathology/MI/auroc_ci95_hi": {
+        "mean": 0.9359881466734032,
+        "std": 0.003007747150365238
+      },
+      "pathology/MI/auroc_ci95_lo": {
+        "mean": 0.9118542468144955,
+        "std": 0.0036636045378458035
+      },
+      "pathology/NORM/auroc": {
+        "mean": 0.9420315506395193,
+        "std": 0.002249186424216296
+      },
+      "pathology/NORM/auroc_ci95_hi": {
+        "mean": 0.9505389979131763,
+        "std": 0.0021550365127683386
+      },
+      "pathology/NORM/auroc_ci95_lo": {
+        "mean": 0.9336166967448252,
+        "std": 0.002461927335468291
+      },
+      "pathology/STTC/auroc": {
+        "mean": 0.9310938166742977,
+        "std": 0.0012780771462785304
+      },
+      "pathology/STTC/auroc_ci95_hi": {
+        "mean": 0.9434018067557483,
+        "std": 0.0016587528776732126
+      },
+      "pathology/STTC/auroc_ci95_lo": {
+        "mean": 0.9199364209635483,
+        "std": 0.0012045344666354102
+      },
+      "pathology/intervened_macro_auroc": {
+        "mean": 0.8275928979955895,
+        "std": 0.008210553434788256
+      },
+      "pathology/intervention_gain": {
+        "mean": -0.08138009661576033,
+        "std": 0.010260445665986152
+      },
+      "pathology/macro_auroc": {
+        "mean": 0.9089729946113497,
+        "std": 0.002240370725472404
+      },
+      "pathology/macro_auroc_boot_std": {
+        "mean": 0.004190559631539065,
+        "std": 2.077890643380169e-05
+      },
+      "pathology/macro_auroc_ci95_hi": {
+        "mean": 0.9169152661953449,
+        "std": 0.0020441657196454462
+      },
+      "pathology/macro_auroc_ci95_lo": {
+        "mean": 0.900873166869094,
+        "std": 0.0021972318123951186
+      },
+      "pathology/macro_brier": {
+        "mean": 0.09147206352796562,
+        "std": 0.0020256600227842895
+      },
+      "pathology/macro_ece": {
+        "mean": 0.05097497474868123,
+        "std": 0.005571695464121361
+      },
+      "pathology/mc_brier": {
+        "mean": 0.08955947251153078,
+        "std": 0.001595640326789378
+      },
+      "pathology/mc_ece": {
+        "mean": 0.04277779400221789,
+        "std": 0.0038555723130913534
+      },
+      "pathology/mc_macro_auroc": {
+        "mean": 0.9094965056348165,
+        "std": 0.0021275821261347904
+      },
+      "seg/P/hard_dice": {
+        "mean": 0.9480521042763219,
+        "std": 0.004840467394127531
+      },
+      "seg/P/mae": {
+        "mean": 0.026090659505134284,
+        "std": 0.001010713700819611
+      },
+      "seg/P/soft_dice": {
+        "mean": 0.7416205929497163,
+        "std": 0.0015494730076304304
+      },
+      "seg/PQ/hard_dice": {
+        "mean": 0.7769090846362386,
+        "std": 0.04432530473526542
+      },
+      "seg/PQ/mae": {
+        "mean": 0.008118764630295415,
+        "std": 0.0012900751239104137
+      },
+      "seg/PQ/soft_dice": {
+        "mean": 0.3771159586891339,
+        "std": 0.009925628956544275
+      },
+      "seg/QRS/hard_dice": {
+        "mean": 0.9730209087663703,
+        "std": 0.0009405442971033255
+      },
+      "seg/QRS/mae": {
+        "mean": 0.010702369234075249,
+        "std": 0.0005517646465374519
+      },
+      "seg/QRS/soft_dice": {
+        "mean": 0.8494138452557464,
+        "std": 0.0013185715349270496
+      },
+      "seg/ST/hard_dice": {
+        "mean": 0.9320216857130988,
+        "std": 0.004060650649872546
+      },
+      "seg/ST/mae": {
+        "mean": 0.01340302419387683,
+        "std": 0.0012136533810878552
+      },
+      "seg/ST/soft_dice": {
+        "mean": 0.6078828844370195,
+        "std": 0.003969870642117687
+      },
+      "seg/T/hard_dice": {
+        "mean": 0.9674454214516364,
+        "std": 0.001074767431213702
+      },
+      "seg/T/mae": {
+        "mean": 0.024121254455547896,
+        "std": 0.0005605341365577562
+      },
+      "seg/T/soft_dice": {
+        "mean": 0.7694704947193073,
+        "std": 0.00408729182879855
+      },
+      "seg/TP/hard_dice": {
+        "mean": 0.9704869379558874,
+        "std": 0.00035321180440361384
+      },
+      "seg/TP/mae": {
+        "mean": 0.025646400153148813,
+        "std": 0.000680201012232806
+      },
+      "seg/TP/soft_dice": {
+        "mean": 0.7904998484707834,
+        "std": 0.0043773575503188045
+      },
+      "seg/argmax_acc": {
+        "mean": 0.9591557476493783,
+        "std": 0.001425844456648782
+      },
+      "seg/macro_hard_dice": {
+        "mean": 0.9279893571332588,
+        "std": 0.007507583388689842
+      },
+      "seg/macro_soft_dice": {
+        "mean": 0.6893339374202845,
+        "std": 0.0010041042048170926
+      },
+      "seg/mean_kl": {
+        "mean": 0.032952384617822544,
+        "std": 0.0006106869762558187
+      },
+      "seg/mean_mae": {
+        "mean": 0.01801374536201308,
+        "std": 0.00022324677207618786
+      },
+      "uncertainty/boundary_std": {
+        "mean": 0.02011455802453889,
+        "std": 0.00016893349841834223
+      },
+      "uncertainty/boundary_vs_interior": {
+        "mean": 1.850586121124265,
+        "std": 0.03241489010182676
+      },
+      "uncertainty/interior_std": {
+        "mean": 0.010871421959665088,
+        "std": 0.0002048623584994601
+      },
+      "uncertainty/mean_per_timestamp_std": {
+        "mean": 0.011985322460532188,
+        "std": 0.00019197003271024043
+      },
+      "uncertainty/seg_error_detection_auroc": {
+        "mean": 0.8519697131772497,
+        "std": 0.0028303252284356847
+      },
+      "uncertainty/task_error_detection_auroc": {
+        "mean": 0.8166992863043064,
+        "std": 0.0028483358448622683
+      },
+      "uncertainty/task_error_detection_auroc_pooled": {
+        "mean": 0.8183918553666286,
+        "std": 0.0028041080883678153
+      },
+      "uncertainty/task_mean_std": {
+        "mean": 0.021275927623112995,
+        "std": 0.0011866245176399908
+      }
+    },
+    "dense_cem": {
+      "n_seeds": 3,
+      "counterfactual/ablate_PQ_task_shift": {
+        "mean": 0.004424422397278249,
+        "std": 0.0023172371482061502
+      },
+      "counterfactual/ablate_P_task_shift": {
+        "mean": 0.010416913674109511,
+        "std": 0.005123829082347296
+      },
+      "counterfactual/ablate_QRS_task_shift": {
+        "mean": 0.06000166841679149,
+        "std": 0.010759125885915297
+      },
+      "counterfactual/ablate_ST_task_shift": {
+        "mean": 0.01840273854840133,
+        "std": 0.018614022840479253
+      },
+      "counterfactual/ablate_T_task_shift": {
+        "mean": 0.08552380816804038,
+        "std": 0.01695683786154734
+      },
+      "leakage/bottleneck_excess_auroc": {
+        "mean": 0.10900068722261684,
+        "std": 0.002963253220373293
+      },
+      "leakage/bottleneck_probe_auroc": {
+        "mean": 0.9032122228871339,
+        "std": 0.002963253220373293
+      },
+      "leakage/gt_mask_probe_auroc": {
+        "mean": 0.794211535664517,
+        "std": 0.0
+      },
+      "leakage/pred_mask_probe_auroc": {
+        "mean": 0.8075628811544279,
+        "std": 0.003511799022202988
+      },
+      "leakage/soft_mask_excess_auroc": {
+        "mean": 0.013351345489910979,
+        "std": 0.0035117990222029885
+      },
+      "pathology/CD/auroc": {
+        "mean": 0.9178847939805163,
+        "std": 0.004516793158653351
+      },
+      "pathology/CD/auroc_ci95_hi": {
+        "mean": 0.9324848430843238,
+        "std": 0.0038297677052669824
+      },
+      "pathology/CD/auroc_ci95_lo": {
+        "mean": 0.9028005305166454,
+        "std": 0.004337825858791553
+      },
+      "pathology/HYP/auroc": {
+        "mean": 0.8137581356591593,
+        "std": 0.006893835823537571
+      },
+      "pathology/HYP/auroc_ci95_hi": {
+        "mean": 0.8406321929466563,
+        "std": 0.0056976900277771764
+      },
+      "pathology/HYP/auroc_ci95_lo": {
+        "mean": 0.7858586974487469,
+        "std": 0.0081208430023842
+      },
+      "pathology/MI/auroc": {
+        "mean": 0.9117762577228596,
+        "std": 0.009185826361415418
+      },
+      "pathology/MI/auroc_ci95_hi": {
+        "mean": 0.9245399324887323,
+        "std": 0.00871130909349693
+      },
+      "pathology/MI/auroc_ci95_lo": {
+        "mean": 0.8977855481573517,
+        "std": 0.010068653627965402
+      },
+      "pathology/NORM/auroc": {
+        "mean": 0.9383417205847113,
+        "std": 0.000615249561105527
+      },
+      "pathology/NORM/auroc_ci95_hi": {
+        "mean": 0.9473912602521515,
+        "std": 0.0003732218203191631
+      },
+      "pathology/NORM/auroc_ci95_lo": {
+        "mean": 0.9296544438572916,
+        "std": 0.0008435349045305293
+      },
+      "pathology/STTC/auroc": {
+        "mean": 0.9247999576399207,
+        "std": 0.00426066612952058
+      },
+      "pathology/STTC/auroc_ci95_hi": {
+        "mean": 0.9371741194814858,
+        "std": 0.004179232703153185
+      },
+      "pathology/STTC/auroc_ci95_lo": {
+        "mean": 0.9129177482506515,
+        "std": 0.004320063922592429
+      },
+      "pathology/intervened_macro_auroc": {
+        "mean": 0.9016291045422657,
+        "std": 0.0014933982895580773
+      },
+      "pathology/intervention_gain": {
+        "mean": 0.00031693142483235626,
+        "std": 0.0003590185422696715
+      },
+      "pathology/macro_auroc": {
+        "mean": 0.9013121731174333,
+        "std": 0.001217725106335239
+      },
+      "pathology/macro_auroc_boot_std": {
+        "mean": 0.0042084471977390766,
+        "std": 4.9993674376377184e-05
+      },
+      "pathology/macro_auroc_ci95_hi": {
+        "mean": 0.9093176346667042,
+        "std": 0.001117466077113653
+      },
+      "pathology/macro_auroc_ci95_lo": {
+        "mean": 0.8934324864841612,
+        "std": 0.0010563290689019687
+      },
+      "pathology/macro_brier": {
+        "mean": 0.09733208580414116,
+        "std": 0.0055815767919907625
+      },
+      "pathology/macro_ece": {
+        "mean": 0.053003701709893936,
+        "std": 0.022447767258786284
+      },
+      "pathology/mc_brier": {
+        "mean": 0.09732699044668337,
+        "std": 0.00666529607460314
+      },
+      "pathology/mc_ece": {
+        "mean": 0.051464636360366,
+        "std": 0.02279373884432726
+      },
+      "pathology/mc_macro_auroc": {
+        "mean": 0.9010223197718155,
+        "std": 0.0028361564566297326
+      },
+      "seg/P/hard_dice": {
+        "mean": 0.9445058935577535,
+        "std": 0.00425602261454373
+      },
+      "seg/P/mae": {
+        "mean": 0.02867798435626552,
+        "std": 0.0012694461491667463
+      },
+      "seg/P/soft_dice": {
+        "mean": 0.7247791193448977,
+        "std": 0.0031707668444429164
+      },
+      "seg/PQ/hard_dice": {
+        "mean": 0.784430988579989,
+        "std": 0.023314952163466622
+      },
+      "seg/PQ/mae": {
+        "mean": 0.007692302792948017,
+        "std": 0.0006476801334830235
+      },
+      "seg/PQ/soft_dice": {
+        "mean": 0.3577183156221419,
+        "std": 0.006256738202289506
+      },
+      "seg/QRS/hard_dice": {
+        "mean": 0.9778544180095974,
+        "std": 0.0006297519718285796
+      },
+      "seg/QRS/mae": {
+        "mean": 0.00831330523550203,
+        "std": 0.00011276479911632202
+      },
+      "seg/QRS/soft_dice": {
+        "mean": 0.8486008377492847,
+        "std": 0.0019364947624991946
+      },
+      "seg/ST/hard_dice": {
+        "mean": 0.9386757246211385,
+        "std": 0.0020804398282356254
+      },
+      "seg/ST/mae": {
+        "mean": 0.01076386375531378,
+        "std": 0.00011514723747702708
+      },
+      "seg/ST/soft_dice": {
+        "mean": 0.5962460655959687,
+        "std": 0.0036344157712535335
+      },
+      "seg/T/hard_dice": {
+        "mean": 0.9663411608946969,
+        "std": 0.001852727031238788
+      },
+      "seg/T/mae": {
+        "mean": 0.024173286842945525,
+        "std": 0.0007006589158673483
+      },
+      "seg/T/soft_dice": {
+        "mean": 0.7575967213225044,
+        "std": 0.0015735591719863396
+      },
+      "seg/TP/hard_dice": {
+        "mean": 0.9669735502593281,
+        "std": 0.001387289656329233
+      },
+      "seg/TP/mae": {
+        "mean": 0.028867424170899325,
+        "std": 0.0009248723097916214
+      },
+      "seg/TP/soft_dice": {
+        "mean": 0.7758132222702905,
+        "std": 0.005383908859641929
+      },
+      "seg/argmax_acc": {
+        "mean": 0.9587459811950257,
+        "std": 0.0023830649844819173
+      },
+      "seg/macro_hard_dice": {
+        "mean": 0.9297969559870839,
+        "std": 0.005455619335901502
+      },
+      "seg/macro_soft_dice": {
+        "mean": 0.6767923803175145,
+        "std": 0.002318911147894205
+      },
+      "seg/mean_kl": {
+        "mean": 0.03268499872487062,
+        "std": 0.001734464046543753
+      },
+      "seg/mean_mae": {
+        "mean": 0.018081361192312368,
+        "std": 0.0005302938398320687
+      },
+      "uncertainty/boundary_std": {
+        "mean": 0.020421548436085384,
+        "std": 0.0007373925189459435
+      },
+      "uncertainty/boundary_vs_interior": {
+        "mean": 2.228228836461703,
+        "std": 0.05025185654174932
+      },
+      "uncertainty/interior_std": {
+        "mean": 0.009173030551109048,
+        "std": 0.0005418027863614191
+      },
+      "uncertainty/mean_per_timestamp_std": {
+        "mean": 0.010548886222143969,
+        "std": 0.000538004222093133
+      },
+      "uncertainty/seg_error_detection_auroc": {
+        "mean": 0.8883660437486348,
+        "std": 0.005370474221736799
+      },
+      "uncertainty/task_error_detection_auroc": {
+        "mean": 0.8009719694019418,
+        "std": 0.0077866595187213155
+      },
+      "uncertainty/task_error_detection_auroc_pooled": {
+        "mean": 0.7943818723146836,
+        "std": 0.01637641513124058
+      },
+      "uncertainty/task_mean_std": {
+        "mean": 0.023052974914511044,
+        "std": 0.002558480278313491
+      }
+    },
+    "dense_multitask": {
+      "n_seeds": 3,
+      "pathology/CD/auroc": {
+        "mean": 0.9307191570953842,
+        "std": 0.0010552929267996054
+      },
+      "pathology/CD/auroc_ci95_hi": {
+        "mean": 0.9431607290819354,
+        "std": 0.0007909464251263202
+      },
+      "pathology/CD/auroc_ci95_lo": {
+        "mean": 0.9164632785930101,
+        "std": 0.0018207271622636015
+      },
+      "pathology/HYP/auroc": {
+        "mean": 0.8426173821840894,
+        "std": 0.0058913520489956425
+      },
+      "pathology/HYP/auroc_ci95_hi": {
+        "mean": 0.8659220510994233,
+        "std": 0.005769777029426225
+      },
+      "pathology/HYP/auroc_ci95_lo": {
+        "mean": 0.8176949041682615,
+        "std": 0.005733555249037433
+      },
+      "pathology/MI/auroc": {
+        "mean": 0.9264875698734922,
+        "std": 0.003224057219813498
+      },
+      "pathology/MI/auroc_ci95_hi": {
+        "mean": 0.9379450168194,
+        "std": 0.002758674320806714
+      },
+      "pathology/MI/auroc_ci95_lo": {
+        "mean": 0.9138733523668581,
+        "std": 0.003118913260087627
+      },
+      "pathology/NORM/auroc": {
+        "mean": 0.9441480528543981,
+        "std": 0.0017011587996095439
+      },
+      "pathology/NORM/auroc_ci95_hi": {
+        "mean": 0.952528013742092,
+        "std": 0.00167386511558638
+      },
+      "pathology/NORM/auroc_ci95_lo": {
+        "mean": 0.9360102744548833,
+        "std": 0.002086610413961655
+      },
+      "pathology/STTC/auroc": {
+        "mean": 0.9332242794893117,
+        "std": 0.002651120566792588
+      },
+      "pathology/STTC/auroc_ci95_hi": {
+        "mean": 0.9443890111919625,
+        "std": 0.0021999702031979262
+      },
+      "pathology/STTC/auroc_ci95_lo": {
+        "mean": 0.9223104122184395,
+        "std": 0.0031268606136383523
+      },
+      "pathology/macro_auroc": {
+        "mean": 0.9154392882993352,
+        "std": 0.001539900826776245
+      },
+      "pathology/macro_auroc_boot_std": {
+        "mean": 0.003961625172872254,
+        "std": 8.504163267982685e-05
+      },
+      "pathology/macro_auroc_ci95_hi": {
+        "mean": 0.9229155587322939,
+        "std": 0.001382277571499411
+      },
+      "pathology/macro_auroc_ci95_lo": {
+        "mean": 0.9080381312454926,
+        "std": 0.001691309858540507
+      },
+      "pathology/macro_brier": {
+        "mean": 0.08894443729897601,
+        "std": 0.0027535307398103047
+      },
+      "pathology/macro_ece": {
+        "mean": 0.043235322839272256,
+        "std": 0.009898879250264662
+      },
+      "pathology/mc_brier": {
+        "mean": 0.08786698408435001,
+        "std": 0.0023034293203532965
+      },
+      "pathology/mc_ece": {
+        "mean": 0.03879740546054163,
+        "std": 0.00807941858480325
+      },
+      "pathology/mc_macro_auroc": {
+        "mean": 0.9154063313771573,
+        "std": 0.0014451356467882416
+      },
+      "seg/P/hard_dice": {
+        "mean": 0.9511256417617554,
+        "std": 1.9222232491018475e-05
+      },
+      "seg/P/mae": {
+        "mean": 0.024724560909716694,
+        "std": 0.0003030338638313403
+      },
+      "seg/P/soft_dice": {
+        "mean": 0.7423485516350959,
+        "std": 0.0007404570710917058
+      },
+      "seg/PQ/hard_dice": {
+        "mean": 0.8081906360338054,
+        "std": 0.01332571433623819
+      },
+      "seg/PQ/mae": {
+        "mean": 0.00723649941960139,
+        "std": 0.00011152103118718783
+      },
+      "seg/PQ/soft_dice": {
+        "mean": 0.37603967536099053,
+        "std": 0.0029145922801925603
+      },
+      "seg/QRS/hard_dice": {
+        "mean": 0.9800952197763889,
+        "std": 0.0012964443985328642
+      },
+      "seg/QRS/mae": {
+        "mean": 0.007892833310544654,
+        "std": 6.152879215184311e-05
+      },
+      "seg/QRS/soft_dice": {
+        "mean": 0.8551679800183941,
+        "std": 0.000299514370320242
+      },
+      "seg/ST/hard_dice": {
+        "mean": 0.9467305269957902,
+        "std": 0.00026021255009671266
+      },
+      "seg/ST/mae": {
+        "mean": 0.010533046316297841,
+        "std": 0.00017400857558716673
+      },
+      "seg/ST/soft_dice": {
+        "mean": 0.6162313342091491,
+        "std": 0.00029527563200909654
+      },
+      "seg/T/hard_dice": {
+        "mean": 0.9706965479095059,
+        "std": 0.00039562900363181007
+      },
+      "seg/T/mae": {
+        "mean": 0.0211976697954728,
+        "std": 0.0004246313198325367
+      },
+      "seg/T/soft_dice": {
+        "mean": 0.7727248693723351,
+        "std": 0.0016629256640265078
+      },
+      "seg/TP/hard_dice": {
+        "mean": 0.9709423078993392,
+        "std": 0.00019497812518616395
+      },
+      "seg/TP/mae": {
+        "mean": 0.02414227628143838,
+        "std": 0.0003819917629867908
+      },
+      "seg/TP/soft_dice": {
+        "mean": 0.7909412478011668,
+        "std": 0.0008086850025720494
+      },
+      "seg/argmax_acc": {
+        "mean": 0.9637591750075826,
+        "std": 0.0005049000894784567
+      },
+      "seg/macro_hard_dice": {
+        "mean": 0.9379634800627641,
+        "std": 0.002437050847800464
+      },
+      "seg/macro_soft_dice": {
+        "mean": 0.6922422763995218,
+        "std": 0.00036526683636549996
+      },
+      "seg/mean_kl": {
+        "mean": 0.029247805529737023,
+        "std": 0.0004237013617886088
+      },
+      "seg/mean_mae": {
+        "mean": 0.015954481005511962,
+        "std": 0.00018212825319538847
+      },
+      "uncertainty/boundary_std": {
+        "mean": 0.020164340527521238,
+        "std": 0.00014501702853059225
+      },
+      "uncertainty/boundary_vs_interior": {
+        "mean": 1.8604991678700358,
+        "std": 0.028131933210916494
+      },
+      "uncertainty/interior_std": {
+        "mean": 0.010839115517834822,
+        "std": 0.00010593269165776921
+      },
+      "uncertainty/mean_per_timestamp_std": {
+        "mean": 0.011969665375848612,
+        "std": 6.998448004895688e-05
+      },
+      "uncertainty/seg_error_detection_auroc": {
+        "mean": 0.85082208990861,
+        "std": 0.002603093789037417
+      },
+      "uncertainty/task_error_detection_auroc": {
+        "mean": 0.8226687323224965,
+        "std": 0.0047539313563605455
+      },
+      "uncertainty/task_error_detection_auroc_pooled": {
+        "mean": 0.8245550183571885,
+        "std": 0.003625810741899375
+      },
+      "uncertainty/task_mean_std": {
+        "mean": 0.022142700230081875,
+        "std": 0.0005010827323109864
+      }
+    }
+  },
+  "pathology_models": {
+    "pathology_blackbox": {
+      "pathology/NORM/auroc": 0.9441615060896911,
+      "pathology/MI/auroc": 0.9240688437775817,
+      "pathology/STTC/auroc": 0.9326264495089658,
+      "pathology/CD/auroc": 0.9192115063871726,
+      "pathology/HYP/auroc": 0.8349571793577693,
+      "pathology/macro_auroc": 0.9110050970242363
+    },
+    "pathology_cbm": {
+      "pathology/NORM/auroc": 0.9433543119721183,
+      "pathology/MI/auroc": 0.9073267872903796,
+      "pathology/STTC/auroc": 0.9262198768442985,
+      "pathology/CD/auroc": 0.907086302642053,
+      "pathology/HYP/auroc": 0.8151378461926693,
+      "pathology/macro_auroc": 0.899825024988304,
+      "concept/mean_mae": 0.5797531142830848,
+      "concept/mean_r2": 0.1797119413415506,
+      "pathology/intervened_macro_auroc": 0.7139034757462748,
+      "pathology/intervention_gain": -0.1859215492420292
+    },
+    "pathology_cbm_detached": {
+      "pathology/NORM/auroc": 0.8714089321074072,
+      "pathology/MI/auroc": 0.7883666151809355,
+      "pathology/STTC/auroc": 0.8468075762247825,
+      "pathology/CD/auroc": 0.802138613016944,
+      "pathology/HYP/auroc": 0.7223420446659518,
+      "pathology/macro_auroc": 0.8062127562392043,
+      "pathology/macro_auroc_ci95_lo": 0.7946505956372161,
+      "pathology/macro_auroc_ci95_hi": 0.8175878179025031,
+      "pathology/macro_auroc_boot_std": 0.005748855047656893,
+      "pathology/NORM/auroc_ci95_lo": 0.8582708967573973,
+      "pathology/NORM/auroc_ci95_hi": 0.8856420602671166,
+      "pathology/MI/auroc_ci95_lo": 0.7671531418326585,
+      "pathology/MI/auroc_ci95_hi": 0.810089788384005,
+      "pathology/STTC/auroc_ci95_lo": 0.8277974280640056,
+      "pathology/STTC/auroc_ci95_hi": 0.8660196664467528,
+      "pathology/CD/auroc_ci95_lo": 0.781579155054591,
+      "pathology/CD/auroc_ci95_hi": 0.8244977697562786,
+      "pathology/HYP/auroc_ci95_lo": 0.6887132176606676,
+      "pathology/HYP/auroc_ci95_hi": 0.7542215274077716,
+      "concept/mean_mae": 0.3963587678968906,
+      "concept/mean_r2": 0.48018629846322514,
+      "pathology/intervened_macro_auroc": 0.7741165680282804,
+      "pathology/intervention_gain": -0.03209618821092386
+    },
+    "pathology_cem": {
+      "pathology/NORM/auroc": 0.9468159975784176,
+      "pathology/MI/auroc": 0.9263261253309798,
+      "pathology/STTC/auroc": 0.9364014801110083,
+      "pathology/CD/auroc": 0.9275638717258634,
+      "pathology/HYP/auroc": 0.8484046747839252,
+      "pathology/macro_auroc": 0.9171024299060389,
+      "concept/mean_mae": 0.41356363371014593,
+      "concept/mean_r2": 0.4350709642968235,
+      "pathology/intervened_macro_auroc": 0.9193024150033009,
+      "pathology/intervention_gain": 0.002199985097262047
+    },
+    "pathology_cem_s42": {
+      "pathology/NORM/auroc": 0.9452251525050346,
+      "pathology/MI/auroc": 0.9231707855251544,
+      "pathology/STTC/auroc": 0.9326194414076004,
+      "pathology/CD/auroc": 0.9154137921231189,
+      "pathology/HYP/auroc": 0.8351977004605388,
+      "pathology/macro_auroc": 0.9103253744042894,
+      "pathology/macro_auroc_ci95_lo": 0.9024799144429809,
+      "pathology/macro_auroc_ci95_hi": 0.9181308369195574,
+      "pathology/macro_auroc_boot_std": 0.004078024055729034,
+      "pathology/NORM/auroc_ci95_lo": 0.937315904702508,
+      "pathology/NORM/auroc_ci95_hi": 0.9533435875380191,
+      "pathology/MI/auroc_ci95_lo": 0.9109206298904424,
+      "pathology/MI/auroc_ci95_hi": 0.9349733205840615,
+      "pathology/STTC/auroc_ci95_lo": 0.9216048988074323,
+      "pathology/STTC/auroc_ci95_hi": 0.9438036894842351,
+      "pathology/CD/auroc_ci95_lo": 0.8981806201907474,
+      "pathology/CD/auroc_ci95_hi": 0.9306823833149018,
+      "pathology/HYP/auroc_ci95_lo": 0.8086616275128417,
+      "pathology/HYP/auroc_ci95_hi": 0.8595748660009753,
+      "concept/mean_mae": 0.4239205300807953,
+      "concept/mean_r2": 0.4115594111058371,
+      "pathology/intervened_macro_auroc": 0.9136274096633444,
+      "pathology/intervention_gain": 0.003302035259055036
+    }
+  },
+  "pathology_multiseed": {},
+  "cross_delineator": {
+    "inter_delineator_nk_vs_ecgdeli": {
+      "n_records": 200,
+      "n_windows": 36200,
+      "task_agreement_acc": 0.8937845303867403,
+      "task_agreement_f1": 0.9203851330365462,
+      "per_concept_f1": {
+        "P": 0.9926957119532526,
+        "Q": 0.9924712070634817,
+        "R": 0.995425616547335,
+        "S": 0.9894875352203327,
+        "T": 0.987438637019925,
+        "PR": 0.9760473417245914,
+        "QRS": 0.964524979263702,
+        "ST": 0.9670734429645063,
+        "QT": 0.9313438178116821
+      },
+      "shared_macro_f1": 0.9773898099520897
+    },
+    "models": {
+      "cbm_randint_v2": {
+        "vs_neurokit2": {
+          "task/accuracy": 0.745524861878453,
+          "task/f1": 0.7657052749376876,
+          "task/auroc": 0.8142527883425538,
+          "concept/P/f1": 0.9859874757799556,
+          "concept/P/auroc": 0.9386730997880929,
+          "concept/Q/f1": 0.9561819289460781,
+          "concept/Q/auroc": 0.9533161589980009,
+          "concept/R/f1": 0.9636766887475581,
+          "concept/R/auroc": 0.972343588133216,
+          "concept/S/f1": 0.9868370931561349,
+          "concept/S/auroc": 0.8434611467689372,
+          "concept/T/f1": 0.9698501119852984,
+          "concept/T/auroc": 0.8133021527714043,
+          "concept/PR/f1": 0.9484458869055049,
+          "concept/PR/auroc": 0.9419350133111128,
+          "concept/QRS/f1": 0.8637548406315162,
+          "concept/QRS/auroc": 0.9278242965241985,
+          "concept/ST/f1": 0.8333202911025902,
+          "concept/ST/auroc": 0.8565337855512568,
+          "concept/QT/f1": 0.7653928366612794,
+          "concept/QT/auroc": 0.8157226787870219,
+          "concept/shared_macro_f1": 0.9192719059906573
+        },
+        "vs_zenodo_ecgdeli": {
+          "task/accuracy": 0.7010220994475138,
+          "task/f1": 0.7374523930815322,
+          "task/auroc": 0.774009037722982,
+          "concept/P/f1": 0.9869049800544099,
+          "concept/P/auroc": 0.9369370013433881,
+          "concept/Q/f1": 0.9547205877960634,
+          "concept/Q/auroc": 0.9595908596229202,
+          "concept/R/f1": 0.9643103170299149,
+          "concept/R/auroc": 0.9847541553066866,
+          "concept/S/f1": 0.9912584203019305,
+          "concept/S/auroc": 0.9342501117239167,
+          "concept/T/f1": 0.9772471469888444,
+          "concept/T/auroc": 0.8996983785253714,
+          "concept/PR/f1": 0.9607935298789283,
+          "concept/PR/auroc": 0.9626694182555189,
+          "concept/QRS/f1": 0.8322842883358773,
+          "concept/QRS/auroc": 0.9619611282911784,
+          "concept/ST/f1": 0.8494870492635855,
+          "concept/ST/auroc": 0.8781804333853629,
+          "concept/QT/f1": 0.7335805903260701,
+          "concept/QT/auroc": 0.7843279804172045,
+          "concept/shared_macro_f1": 0.9167318788861805
+        }
+      },
+      "cem_v2": {
+        "vs_neurokit2": {
+          "task/accuracy": 0.765524861878453,
+          "task/f1": 0.7881495532371587,
+          "task/auroc": 0.8354172964300879,
+          "concept/P/f1": 0.9859874757799556,
+          "concept/P/auroc": 0.9558522090889457,
+          "concept/Q/f1": 0.9681255597480584,
+          "concept/Q/auroc": 0.9498122005098373,
+          "concept/R/f1": 0.9904800022870865,
+          "concept/R/auroc": 0.971530893840156,
+          "concept/S/f1": 0.9895995692464647,
+          "concept/S/auroc": 0.923944377931007,
+          "concept/T/f1": 0.9825339379461284,
+          "concept/T/auroc": 0.8544736790597353,
+          "concept/PR/f1": 0.9803337306317044,
+          "concept/PR/auroc": 0.9645895940254231,
+          "concept/QRS/f1": 0.9361995552414281,
+          "concept/QRS/auroc": 0.9577040276674881,
+          "concept/ST/f1": 0.9525019480299488,
+          "concept/ST/auroc": 0.9306022325609205,
+          "concept/QT/f1": 0.814907079866474,
+          "concept/QT/auroc": 0.8984928782128401,
+          "concept/shared_macro_f1": 0.9556298731974722
+        },
+        "vs_zenodo_ecgdeli": {
+          "task/accuracy": 0.7222375690607735,
+          "task/f1": 0.7604298205904076,
+          "task/auroc": 0.7896094038261369,
+          "concept/P/f1": 0.9869049800544099,
+          "concept/P/auroc": 0.9692337405193112,
+          "concept/Q/f1": 0.9670754563834654,
+          "concept/Q/auroc": 0.9621387135886634,
+          "concept/R/f1": 0.9920401700379448,
+          "concept/R/auroc": 0.9901150680187173,
+          "concept/S/f1": 0.9932208197418806,
+          "concept/S/auroc": 0.9733993472063462,
+          "concept/T/f1": 0.9901195309616422,
+          "concept/T/auroc": 0.9352915494879145,
+          "concept/PR/f1": 0.9754067932933242,
+          "concept/PR/auroc": 0.9830629157964975,
+          "concept/QRS/f1": 0.9165818274370069,
+          "concept/QRS/auroc": 0.9831521781433964,
+          "concept/ST/f1": 0.9585025046137622,
+          "concept/ST/auroc": 0.961544225347671,
+          "concept/QT/f1": 0.7837184044233807,
+          "concept/QT/auroc": 0.8673626765570139,
+          "concept/shared_macro_f1": 0.9515078318829797
+        }
+      },
+      "cbm_softseg": {
+        "vs_neurokit2": {
+          "task/accuracy": 0.886049723756906,
+          "task/f1": 0.9148167268972638,
+          "task/auroc": 0.9459587359198822,
+          "concept/P/f1": 0.9919529117379435,
+          "concept/P/auroc": 0.9667886838840588,
+          "concept/Q/f1": 0.9899217081850534,
+          "concept/Q/auroc": 0.9528487616706738,
+          "concept/R/f1": 0.9952899784360458,
+          "concept/R/auroc": 0.9618358871109428,
+          "concept/S/f1": 0.9889385871494498,
+          "concept/S/auroc": 0.9199782037397664,
+          "concept/T/f1": 0.9859845227858985,
+          "concept/T/auroc": 0.893631167483204,
+          "concept/PR/f1": 0.9758585720988663,
+          "concept/PR/auroc": 0.967539709754731,
+          "concept/QRS/f1": 0.9614531160844481,
+          "concept/QRS/auroc": 0.9079075022289229,
+          "concept/ST/f1": 0.9501323231799076,
+          "concept/ST/auroc": 0.9346897819360169,
+          "concept/QT/f1": 0.9111437982970436,
+          "concept/QT/auroc": 0.9358796479515561,
+          "concept/shared_macro_f1": 0.9722972797727396
+        },
+        "vs_zenodo_ecgdeli": {
+          "task/accuracy": 0.9549723756906078,
+          "task/f1": 0.9676137492549175,
+          "task/auroc": 0.990195325006281,
+          "concept/P/f1": 0.9949902230849379,
+          "concept/P/auroc": 0.9926308141416464,
+          "concept/Q/f1": 0.9956205633157774,
+          "concept/Q/auroc": 0.9980068500537611,
+          "concept/R/f1": 0.9979612640163099,
+          "concept/R/auroc": 0.9989351920134777,
+          "concept/S/f1": 0.9968871263485566,
+          "concept/S/auroc": 0.9986817714959405,
+          "concept/T/f1": 0.9942548350398179,
+          "concept/T/auroc": 0.9894343876091771,
+          "concept/PR/f1": 0.9852640839538757,
+          "concept/PR/auroc": 0.9885909773483661,
+          "concept/QRS/f1": 0.9945116864489879,
+          "concept/QRS/auroc": 0.9981949809740486,
+          "concept/ST/f1": 0.9708556101600331,
+          "concept/ST/auroc": 0.9805842368926545,
+          "concept/QT/f1": 0.9691841897888931,
+          "concept/QT/auroc": 0.9920073935696779,
+          "concept/shared_macro_f1": 0.9888366202396877
+        }
+      },
+      "cem_softseg": {
+        "vs_neurokit2": {
+          "task/accuracy": 0.8874861878453039,
+          "task/f1": 0.9156955684805332,
+          "task/auroc": 0.9408014809168113,
+          "concept/P/f1": 0.9922216544597741,
+          "concept/P/auroc": 0.9498633288449764,
+          "concept/Q/f1": 0.9918145000285209,
+          "concept/Q/auroc": 0.9133311793548174,
+          "concept/R/f1": 0.995022476849554,
+          "concept/R/auroc": 0.9530610272305573,
+          "concept/S/f1": 0.989859394972305,
+          "concept/S/auroc": 0.8355014630196328,
+          "concept/T/f1": 0.986173794684433,
+          "concept/T/auroc": 0.8923948748328829,
+          "concept/PR/f1": 0.9753621431601915,
+          "concept/PR/auroc": 0.9667443880108185,
+          "concept/QRS/f1": 0.9610517301531923,
+          "concept/QRS/auroc": 0.8127775494333205,
+          "concept/ST/f1": 0.9595730302032612,
+          "concept/ST/auroc": 0.9500518838864533,
+          "concept/QT/f1": 0.9150769745649264,
+          "concept/QT/auroc": 0.9228989224495475,
+          "concept/shared_macro_f1": 0.9740172998973509
+        },
+        "vs_zenodo_ecgdeli": {
+          "task/accuracy": 0.9570165745856354,
+          "task/f1": 0.9690150941893345,
+          "task/auroc": 0.9922635332543699,
+          "concept/P/f1": 0.9953259041810357,
+          "concept/P/auroc": 0.9934585280391254,
+          "concept/Q/f1": 0.9978782578776845,
+          "concept/Q/auroc": 0.9990386720830895,
+          "concept/R/f1": 0.9977781237174679,
+          "concept/R/auroc": 0.9992043754724704,
+          "concept/S/f1": 0.9972277903356506,
+          "concept/S/auroc": 0.9956755705500683,
+          "concept/T/f1": 0.9938866615485229,
+          "concept/T/auroc": 0.9869656393929548,
+          "concept/PR/f1": 0.9857410114920845,
+          "concept/PR/auroc": 0.9884245609590421,
+          "concept/QRS/f1": 0.9942746694390348,
+          "concept/QRS/auroc": 0.9981556447362276,
+          "concept/ST/f1": 0.9813259309996756,
+          "concept/ST/auroc": 0.9969072751878538,
+          "concept/QT/f1": 0.9800187519533284,
+          "concept/QT/auroc": 0.9983396797614982,
+          "concept/shared_macro_f1": 0.9914952335049428
+        }
+      }
+    }
+  }
+}

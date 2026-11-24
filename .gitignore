@@ -209,6 +209,16 @@ __marimo__/
 .venv*
 *.pkl
 *.pt
+*.npz
+explorer/.env
 
 checkpoints
-runs
+runs/
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+experiments/results/*
+!experiments/results/.gitkeep
+!experiments/results/summary.json
+!experiments/results/summary.md

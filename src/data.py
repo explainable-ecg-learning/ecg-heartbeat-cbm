@@ -1,27 +1,17 @@
 """
-data.py — Unified ECG data loading for the heartbeat CBM project.
+data.py — Unified ECG data loading and preprocessing for the heartbeat CBM/CEM project.
 
-Provides two PyTorch Datasets built from PTB-XL
-(/nfs/data8/schlegel/git/ecg-cbm/data/ptb-xl):
-
-  PTBXLDataset      — full 12-lead records, diagnostic superclass labels + concept
-                      annotations from concepts.parquet. Used for record-level tasks.
-
-  HeartbeatDataset  — beat-segmented subsequences for heartbeat completeness
-                      classification. Labels and concept pseudo-labels are derived
-                      from neurokit2 delineation.
-
-Also exposes signal utilities (bandpass_filter, z_normalize, augment) and the
-delineation helpers used to build HeartbeatDataset offline.
-
-Data path convention (override via config):
-    PTB-XL root:     /nfs/data8/schlegel/git/ecg-cbm/data/ptb-xl
-    Concepts file:   /nfs/data8/schlegel/git/ecg-cbm/data/concepts.parquet
+Provides two PyTorch Datasets built from PTB-XL:
+  PTBXLDataset      — full 12-lead records, 5 diagnostic superclass labels + 20 record-level
+                      morphological/rhythm concepts from concepts.parquet.
+  HeartbeatDataset  — beat-level 12-lead windows for heartbeat completeness classification
+                      with 10 wave/interval concepts derived from neurokit2 delineation.
 """
 
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import logging
 import pickle
@@ -29,6 +19,7 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import neurokit2 as nk
 import numpy as np
 import pandas as pd
 import torch
@@ -37,16 +28,14 @@ from scipy.signal import butter, filtfilt, find_peaks
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
-import neurokit2 as nk
-
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
 
-PTBXL_ROOT      = Path("/nfs/data8/schlegel/git/ecg-cbm/data/ptb-xl")
-CONCEPTS_FILE   = Path("/nfs/data8/schlegel/git/ecg-cbm/data/concepts.parquet")
+PTBXL_ROOT    = Path("/nfs/data8/schlegel/git/ecg-cbm/data/ptb-xl")
+CONCEPTS_FILE = Path("/nfs/data8/schlegel/git/ecg-cbm/data/concepts.parquet")
 
 SUPERCLASS_MAP: Dict[str, int] = {"NORM": 0, "MI": 1, "STTC": 2, "CD": 3, "HYP": 4}
 NUM_SUPERCLASSES = len(SUPERCLASS_MAP)
@@ -62,6 +51,55 @@ NUM_RECORD_CONCEPTS = len(CONCEPT_COLUMNS)
 
 BEAT_CONCEPT_NAMES: List[str] = ["P", "Q", "R", "S", "T", "U", "PR", "QRS", "ST", "QT"]
 NUM_BEAT_CONCEPTS = 10
+CACHE_SCHEMA_VERSION = 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Path & cache helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def resolve_data_paths(cfg: dict) -> Tuple[Path, Path]:
+    """Resolve (ptbxl_path, concept_parquet_path) from a config dictionary."""
+    data_cfg = cfg.get("data", {})
+    data_dir = data_cfg.get("data_dir", None)
+
+    raw_data_path = Path(data_cfg.get("data_path", str(PTBXL_ROOT)))
+    if data_dir and not raw_data_path.is_absolute():
+        data_path = Path(data_dir) / raw_data_path
+    else:
+        data_path = raw_data_path
+
+    raw_concept = Path(data_cfg.get("concept_file", str(CONCEPTS_FILE)))
+    if data_dir and not raw_concept.is_absolute():
+        concept_path = Path(data_dir) / raw_concept
+    else:
+        concept_path = raw_concept
+
+    return data_path, concept_path
+
+
+def dataset_cache_key(data_cfg: dict) -> Tuple[str, dict]:
+    """Compute a deterministic cache key from dataset-shaping config fields."""
+    spec = {
+        "schema_v":              CACHE_SCHEMA_VERSION,
+        "sampling_rate":         int(data_cfg.get("sampling_rate", 500)),
+        "t_fixed":               int(data_cfg.get("t_fixed", 500)),
+        "lead":                  int(data_cfg.get("lead", 1)),
+        "val_fold":              int(data_cfg.get("val_fold", 9)),
+        "test_fold":             int(data_cfg.get("test_fold", 10)),
+        "beat_window_pre":       int(data_cfg.get("beat_window_pre", 250)),
+        "beat_window_post":      int(data_cfg.get("beat_window_post", 250)),
+        "pos_jitter":            int(data_cfg.get("pos_jitter", 60)),
+        "use_masked_norm":       bool(data_cfg.get("use_masked_norm", False)),
+        "neg_oversample_factor": float(data_cfg.get("neg_oversample_factor", 1.0)),
+        "use_sliding_window":    bool(data_cfg.get("use_sliding_window", False)),
+        "stride":                int(data_cfg.get("stride", 50)),
+    }
+    delineator = str(data_cfg.get("delineator", "neurokit2")).lower()
+    if delineator != "neurokit2":
+        spec["delineator"] = delineator
+    digest = hashlib.sha1(json.dumps(spec, sort_keys=True).encode("utf-8")).hexdigest()[:10]
+    return digest, spec
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -82,16 +120,16 @@ def bandpass_filter(
 
 
 def z_normalize(signal: np.ndarray, eps: float = 1e-8) -> np.ndarray:
-    """Per-channel z-score normalisation. signal: (C, T)."""
+    """Per-channel z-score normalisation. signal: (..., T)."""
     mean = signal.mean(axis=-1, keepdims=True)
     std  = signal.std(axis=-1, keepdims=True) + eps
-    return (signal - mean) / std
+    return ((signal - mean) / std).astype(np.float32)
 
 
 def minmax_normalize(signal: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     """Per-channel normalisation to [-1, 1]. signal: (C, T)."""
     mx = np.abs(signal).max(axis=-1, keepdims=True) + eps
-    return signal / mx
+    return (signal / mx).astype(np.float32)
 
 
 def augment(
@@ -105,29 +143,36 @@ def augment(
     lead_dropout_max: int = 2,
     rng: Optional[np.random.Generator] = None,
 ) -> np.ndarray:
-    """Training augmentations: temporal jitter, amplitude scaling, noise, lead dropout."""
+    """Training augmentations: edge-replicated temporal jitter, scaling, noise, lead dropout."""
     if rng is None:
         rng = np.random.default_rng()
     C, T = signal.shape
-    shift     = rng.integers(-temporal_jitter, temporal_jitter + 1)
-    start     = max(0, -shift)
-    src_start = max(0, shift)
-    length    = min(T - src_start, t_fixed - start)
-    out = np.zeros((C, t_fixed), dtype=np.float32)
-    if length > 0:
-        out[:, start : start + length] = signal[:, src_start : src_start + length]
+    shift = int(rng.integers(-temporal_jitter, temporal_jitter + 1)) if temporal_jitter > 0 else 0
+    if shift == 0 and T == t_fixed:
+        out = signal.astype(np.float32, copy=True)
     else:
-        out[:, : min(T, t_fixed)] = signal[:, : min(T, t_fixed)]
-    out = out * rng.uniform(amp_min, amp_max)
-    out = out + rng.standard_normal(out.shape).astype(np.float32) * noise_std
+        # Edge-pad instead of zero-pad so jitter never introduces artificial 0-flatlines
+        src = signal[:, :t_fixed] if T >= t_fixed else np.pad(signal, ((0, 0), (0, t_fixed - T)), mode="edge")
+        if shift > 0:
+            out = np.concatenate([src[:, shift:], np.repeat(src[:, -1:], shift, axis=1)], axis=1)
+        elif shift < 0:
+            s = -shift
+            out = np.concatenate([np.repeat(src[:, :1], s, axis=1), src[:, :-s]], axis=1)
+        else:
+            out = src.copy()
+        out = out.astype(np.float32)
+
+    out = out * float(rng.uniform(amp_min, amp_max))
+    if noise_std > 0:
+        out = out + rng.standard_normal(out.shape).astype(np.float32) * noise_std
     if lead_dropout_prob > 0 and rng.random() < lead_dropout_prob:
-        n_drop = rng.integers(1, lead_dropout_max + 1)
+        n_drop = int(rng.integers(1, lead_dropout_max + 1))
         out[rng.choice(C, size=min(n_drop, C), replace=False)] = 0.0
     return out
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# R-peak detection — multi-lead consensus (adapted from DisentangledECG)
+# R-peak detection — multi-lead consensus
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _detect_r_peaks_multilead(
@@ -136,25 +181,14 @@ def _detect_r_peaks_multilead(
     lead_idx: int = 1,
     min_lead_consensus: int = 6,
 ) -> np.ndarray:
-    """
-    Multi-lead consensus R-peak detection.
-
-    1. Primary detection on `lead_idx` with nk.ecg_clean + nk.ecg_peaks.
-    2. Searches all other leads for peaks not already close to a primary peak;
-       adds a candidate only when ≥ `min_lead_consensus` leads independently
-       agree on it (and amplitude / neighbour-amplitude checks pass).
-    3. Removes weak peaks whose amplitude is < 25 % of both neighbours and
-       < 0.2 in absolute terms.
-    """
-    # signal: (C, T) — transpose to (T, C) for lead indexing
+    """Multi-lead consensus R-peak detection."""
     sig = signal.T  # (T, C)
-    threshold = sampling_rate // 5  # min distance to call two peaks "different"
+    threshold = sampling_rate // 5
 
-    # ── Primary detection ────────────────────────────────────────────────────
     try:
         cleaned = nk.ecg_clean(sig[:, lead_idx], sampling_rate=sampling_rate)
-        _, info  = nk.ecg_peaks(cleaned, sampling_rate=sampling_rate)
-        r_peaks  = np.array(
+        _, info = nk.ecg_peaks(cleaned, sampling_rate=sampling_rate)
+        r_peaks = np.array(
             sorted(int(p) for p in info["ECG_R_Peaks"] if not np.isnan(p)),
             dtype=int,
         )
@@ -164,16 +198,15 @@ def _detect_r_peaks_multilead(
     if len(r_peaks) <= 2:
         return r_peaks
 
-    # ── Cross-validate with remaining leads ──────────────────────────────────
     num_leads = sig.shape[1]
-    candidate_list: list = []  # (peak_idx, lead, amplitude)
+    candidate_list: list = []
 
     for lead in range(num_leads):
         if lead == lead_idx:
             continue
         try:
             cleaned_l = nk.ecg_clean(sig[:, lead], sampling_rate=sampling_rate)
-            _, info_l  = nk.ecg_peaks(cleaned_l, sampling_rate=sampling_rate)
+            _, info_l = nk.ecg_peaks(cleaned_l, sampling_rate=sampling_rate)
             other = [int(p) for p in info_l["ECG_R_Peaks"] if not np.isnan(p)]
             for cand in other:
                 if not np.any(np.abs(r_peaks - cand) < threshold):
@@ -181,7 +214,6 @@ def _detect_r_peaks_multilead(
         except Exception:
             continue
 
-    # Keep only candidates seen in ≥ min_lead_consensus leads
     candidate_list.sort(key=lambda x: x[0])
     i = 0
     while i < len(candidate_list):
@@ -203,7 +235,6 @@ def _detect_r_peaks_multilead(
                         r_peaks = np.unique(np.append(r_peaks, p))
         i = j
 
-    # ── Remove weak peaks ────────────────────────────────────────────────────
     amps = np.abs(sig[r_peaks, lead_idx]).astype(np.float32)
     keep = np.ones(len(r_peaks), dtype=bool)
     for i in range(1, len(r_peaks) - 1):
@@ -219,28 +250,17 @@ def _detect_r_peaks_multilead(
     return r_peaks[keep]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Per-beat masked normalisation (adapted from DisentangledECG)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _masked_normalize_beat(
     beat: np.ndarray,
     mask: np.ndarray,
     eps: float = 1e-6,
 ) -> np.ndarray:
-    """
-    Per-channel mean-variance normalisation using only the natural beat region.
-
-    beat : (C, T) float32
-    mask : (T,)  float32  — 1 inside natural boundary, 0 outside
-
-    The masked-out region is preserved as zeros after normalisation.
-    """
-    m     = mask.astype(np.float32)[np.newaxis, :]          # (1, T)
+    """Legacy per-channel mean-variance normalisation using only the natural beat region."""
+    m     = mask.astype(np.float32)[np.newaxis, :]
     denom = float(np.maximum(m.sum(), 1.0))
-    mean  = (beat * m).sum(axis=1, keepdims=True) / denom   # (C, 1)
+    mean  = (beat * m).sum(axis=1, keepdims=True) / denom
     var   = (((beat - mean) ** 2) * m).sum(axis=1, keepdims=True) / denom
-    std   = np.sqrt(np.maximum(var, eps))                   # (C, 1)
+    std   = np.sqrt(np.maximum(var, eps))
     return ((beat - mean) / std * m).astype(np.float32)
 
 
@@ -278,28 +298,25 @@ def delineate_record(
     sampling_rate: int = 500,
     lead_idx: int = 1,
 ) -> dict:
-    """
-    Full neurokit2 delineation of a (12, T) or 1-D ECG record.
-
-    Uses multi-lead consensus R-peak detection (see _detect_r_peaks_multilead).
-    Returns dict: {r_peaks, delineation, u_peaks, quality_ok}.
-    """
+    """Full neurokit2 delineation of a (12, T) or 1-D ECG record."""
     lead_signal = ecg_signal[lead_idx] if ecg_signal.ndim == 2 else ecg_signal
     try:
-        # Multi-lead consensus R-peak detection
         if ecg_signal.ndim == 2:
             r_peaks = _detect_r_peaks_multilead(ecg_signal, sampling_rate, lead_idx)
         else:
-            # Fallback for 1-D input
             cleaned = nk.ecg_clean(lead_signal, sampling_rate=sampling_rate)
             _, rpeaks_info = nk.ecg_peaks(cleaned, sampling_rate=sampling_rate)
             r_peaks = np.array([int(p) for p in rpeaks_info["ECG_R_Peaks"] if not np.isnan(p)], dtype=int)
 
         if len(r_peaks) < 3:
             return {"r_peaks": r_peaks, "delineation": {}, "u_peaks": [], "quality_ok": False}
+        # Physiological RR bounds scaled by sampling_rate (0.3s–4.0s → 150–2000 samples @ 500Hz)
+        min_rr = int(0.30 * sampling_rate)
+        max_rr = int(4.00 * sampling_rate)
         rr = np.diff(r_peaks)
-        if np.any(rr < 300) or np.any(rr > 2000):
+        if np.any(rr < min_rr) or np.any(rr > max_rr):
             return {"r_peaks": r_peaks, "delineation": {}, "u_peaks": [], "quality_ok": False}
+
         cleaned = nk.ecg_clean(lead_signal, sampling_rate=sampling_rate)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -308,11 +325,16 @@ def delineate_record(
     except Exception:
         return {"r_peaks": np.array([], dtype=int), "delineation": {}, "u_peaks": [], "quality_ok": False}
 
-    t_offsets    = delin.get("ECG_T_Offsets",  np.full(len(r_peaks), np.nan))
-    p_onsets     = delin.get("ECG_P_Onsets",   np.full(len(r_peaks), np.nan))
+    t_offsets     = delin.get("ECG_T_Offsets", np.full(len(r_peaks), np.nan))
+    p_onsets      = delin.get("ECG_P_Onsets",  np.full(len(r_peaks), np.nan))
     next_p_onsets = np.concatenate([p_onsets[1:], [np.nan]])
     u_peaks = _detect_u_wave(lead_signal, t_offsets, next_p_onsets, sampling_rate)
-    return {"r_peaks": r_peaks, "delineation": delin, "u_peaks": np.asarray(u_peaks, dtype=float), "quality_ok": True}
+    return {
+        "r_peaks":     r_peaks,
+        "delineation": delin,
+        "u_peaks":     np.asarray(u_peaks, dtype=float),
+        "quality_ok":  True,
+    }
 
 
 def get_concept_labels(
@@ -323,59 +345,107 @@ def get_concept_labels(
     u_peaks,
 ) -> Tuple[List[int], List[int]]:
     """
-    Derive beat concept vector and confidence weights for a window [start, end].
+    Derive beat concept vector and *beat-level* confidence weights for [subseq_start, subseq_end].
 
-    Returns
-    -------
-    concepts : [P, Q, R, S, T, U, PR, QRS, ST, QT] — 10 binary values
-    weights  : 10 binary values (0 = delineation failed for this concept)
+    Fixes the previous record-level weighting bug where a single delineated beat
+    in a 10s strip caused failed beats elsewhere in the strip to receive weight=1, label=0.
     """
-    def _get(key):
-        v = delineation.get(key, np.array([]))
-        return v if v is not None else np.array([])
+    n_beats = len(r_peaks)
+
+    def _get(key: str) -> np.ndarray:
+        v = delineation.get(key, None)
+        if v is None:
+            return np.array([], dtype=float)
+        return np.asarray(v, dtype=float)
 
     def in_window(indices) -> bool:
         for idx in indices:
-            if not (isinstance(idx, float) and np.isnan(idx)):
+            if not (isinstance(idx, (float, np.floating)) and np.isnan(idx)):
                 if subseq_start <= int(idx) <= subseq_end:
                     return True
         return False
 
-    def span_in_window(starts, ends) -> bool:
+    def span_in_window(starts: np.ndarray, ends: np.ndarray) -> bool:
         for s, e in zip(starts, ends):
             if not (np.isnan(s) or np.isnan(e)) and subseq_start <= int(s) and int(e) <= subseq_end:
                 return True
         return False
 
-    def has_valid(indices) -> bool:
-        return any(not (isinstance(v, float) and np.isnan(v)) for v in indices)
+    # Identify beats whose R-peak lies in the window (or adjacent within half-window margin)
+    win_len = max(1, subseq_end - subseq_start)
+    margin = win_len // 2
+    beats_in_win = [b for b, r in enumerate(r_peaks) if subseq_start <= int(r) <= subseq_end]
+    nearby_beats = beats_in_win if beats_in_win else [
+        b for b, r in enumerate(r_peaks) if (subseq_start - margin) <= int(r) <= (subseq_end + margin)
+    ]
 
-    c_P   = int(in_window(_get("ECG_P_Peaks")))
-    c_Q   = int(in_window(_get("ECG_Q_Peaks")))
+    def wave_weight(concept_val: int, arr: np.ndarray) -> int:
+        if concept_val == 1:
+            return 1
+        if n_beats == 0 or len(arr) != n_beats:
+            return 0
+        if not nearby_beats:
+            return 1
+        # Concept is 0: only confident if delineation succeeded for all beats overlapping the window
+        return int(all(not np.isnan(arr[b]) for b in nearby_beats))
+
+    def span_weight(concept_val: int, starts: np.ndarray, ends: np.ndarray) -> int:
+        if concept_val == 1:
+            return 1
+        if n_beats == 0 or len(starts) != n_beats or len(ends) != n_beats:
+            return 0
+        if not nearby_beats:
+            return 1
+        return int(all(not (np.isnan(starts[b]) or np.isnan(ends[b])) for b in nearby_beats))
+
+    p_peaks   = _get("ECG_P_Peaks")
+    q_peaks   = _get("ECG_Q_Peaks")
+    s_peaks   = _get("ECG_S_Peaks")
+    t_peaks   = _get("ECG_T_Peaks")
+    p_onsets  = _get("ECG_P_Onsets")
+    r_onsets  = _get("ECG_R_Onsets")
+    r_offsets = _get("ECG_R_Offsets")
+    t_offsets = _get("ECG_T_Offsets")
+    u_arr     = np.asarray(u_peaks if u_peaks is not None else [], dtype=float)
+
+    c_P   = int(in_window(p_peaks))
+    c_Q   = int(in_window(q_peaks))
     c_R   = int(in_window(r_peaks))
-    c_S   = int(in_window(_get("ECG_S_Peaks")))
-    c_T   = int(in_window(_get("ECG_T_Peaks")))
-    c_U   = int(in_window(u_peaks if u_peaks is not None else []))
-    c_PR  = int(span_in_window(_get("ECG_P_Onsets"),  _get("ECG_R_Onsets")))
-    c_QRS = int(span_in_window(_get("ECG_R_Onsets"),  _get("ECG_R_Offsets")))
-    c_ST  = int(span_in_window(_get("ECG_R_Offsets"), _get("ECG_T_Offsets")))
-    c_QT  = int(span_in_window(_get("ECG_R_Onsets"),  _get("ECG_T_Offsets")))
+    c_S   = int(in_window(s_peaks))
+    c_T   = int(in_window(t_peaks))
+    c_U   = int(in_window(u_arr))
+    c_PR  = int(span_in_window(p_onsets,  r_onsets))
+    c_QRS = int(span_in_window(r_onsets,  r_offsets))
+    c_ST  = int(span_in_window(r_offsets, t_offsets))
+    c_QT  = int(span_in_window(r_onsets,  t_offsets))
 
-    w_P   = int(has_valid(_get("ECG_P_Peaks")))
-    w_Q   = int(has_valid(_get("ECG_Q_Peaks")))
-    w_R   = 1
-    w_S   = int(has_valid(_get("ECG_S_Peaks")))
-    w_T   = int(has_valid(_get("ECG_T_Peaks")))
-    w_U   = 1
-    w_PR  = int(has_valid(_get("ECG_P_Onsets")) and has_valid(_get("ECG_R_Onsets")))
-    w_QRS = int(has_valid(_get("ECG_R_Onsets")) and has_valid(_get("ECG_R_Offsets")))
-    w_ST  = int(has_valid(_get("ECG_R_Offsets")) and has_valid(_get("ECG_T_Offsets")))
-    w_QT  = int(has_valid(_get("ECG_R_Onsets")) and has_valid(_get("ECG_T_Offsets")))
+    w_P   = wave_weight(c_P, p_peaks)
+    w_Q   = wave_weight(c_Q, q_peaks)
+    w_R   = 1 if n_beats > 0 else 0
+    w_S   = wave_weight(c_S, s_peaks)
+    w_T   = wave_weight(c_T, t_peaks)
+    # If u_peaks is None (e.g. ECGdeli/Zenodo soft segmentation), mask U-wave out (w_U=0)
+    w_U   = 0 if u_peaks is None else (1 if c_U == 1 else wave_weight(0, t_offsets))
+    w_PR  = span_weight(c_PR,  p_onsets,  r_onsets)
+    w_QRS = span_weight(c_QRS, r_onsets,  r_offsets)
+    w_ST  = span_weight(c_ST,  r_offsets, t_offsets)
+    w_QT  = span_weight(c_QT,  r_onsets,  t_offsets)
 
     return (
         [c_P, c_Q, c_R, c_S, c_T, c_U, c_PR, c_QRS, c_ST, c_QT],
         [w_P, w_Q, w_R, w_S, w_T, w_U, w_PR, w_QRS, w_ST, w_QT],
     )
+
+
+def is_complete_heartbeat_window(concepts: List[int], weights: List[int]) -> bool:
+    """
+    Physiological completeness criterion for a window:
+      - Ventricular complex + repolarisation present: QT interval (or R + T waves if offsets NaN)
+      - Atrial activation present when delineated: PR interval or P wave (waived if P/PR undelineated)
+    """
+    has_ventricular = bool(concepts[9]) or (bool(concepts[2]) and bool(concepts[4]) and weights[9] == 0)
+    has_atrial = bool(concepts[6]) or bool(concepts[0]) or (weights[0] == 0 and weights[6] == 0)
+    return has_ventricular and has_atrial
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -385,8 +455,10 @@ def get_concept_labels(
 def _window(signal: np.ndarray, start: int, end: int, t_fixed: int) -> np.ndarray:
     C, T = signal.shape
     chunk = signal[:, max(0, start) : min(T, end)]
+    if chunk.shape[1] == t_fixed:
+        return chunk.astype(np.float32, copy=True)
     out = np.zeros((C, t_fixed), dtype=np.float32)
-    out[:, : min(chunk.shape[1], t_fixed)] = chunk[:, : t_fixed]
+    out[:, : min(chunk.shape[1], t_fixed)] = chunk[:, :t_fixed]
     return out
 
 
@@ -398,16 +470,15 @@ def extract_beats(
     beat_window_post: int = 250,
     neg_oversample_factor: float = 1.0,
     rng: Optional[np.random.Generator] = None,
+    pos_jitter: int = 60,
+    use_masked_norm: bool = False,
 ) -> List[Tuple[np.ndarray, int, List[int], List[int]]]:
     """
-    R-peak aligned beat extraction with natural boundary masking.
+    Extract positive (complete) and negative (incomplete) `t_fixed` windows.
 
-    Positives: symmetric window centred on R-peak; signal is normalised using
-    only the natural beat region (midpoints to neighbouring peaks), following
-    the DisentangledECG approach.
-
-    Negatives: 4 strategies (truncation, late-start, random-crop, inter-beat)
-    using standard per-channel z-normalisation.
+    By default (`use_masked_norm=False`), both positives and negatives are genuine
+    continuous `t_fixed`-sample slices normalised identically with `z_normalize`,
+    eliminating zero-padding/flatline shortcuts and matching sliding-window inference.
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -420,87 +491,113 @@ def extract_beats(
     C, T        = signal.shape
     samples: list = []
 
-    # Symmetric half-widths (mirrors DisentangledECG centering)
-    half_pre  = t_fixed // 2
-    half_post = t_fixed - half_pre
+    p_onsets  = delineation.get("ECG_P_Onsets",  np.full(len(r_peaks), np.nan))
+    t_offsets = delineation.get("ECG_T_Offsets", np.full(len(r_peaks), np.nan))
 
-    # ── Positives (skip first and last — no neighbour on both sides) ─────────
+    # ── Positives ────────────────────────────────────────────────────────────
     for i in range(1, len(r_peaks) - 1):
-        r     = int(r_peaks[i])
-        start = r - half_pre
-        end   = r + half_post
+        r = int(r_peaks[i])
+        jitter = int(rng.integers(-pos_jitter, pos_jitter + 1)) if pos_jitter > 0 else 0
+        start = r - beat_window_pre + jitter
+        end   = start + t_fixed
+
+        # Ensure beat's own delineated P-onset..T-offset remains inside the window
+        if i < len(p_onsets) and not np.isnan(p_onsets[i]):
+            start = min(start, int(p_onsets[i]) - 5)
+            end = start + t_fixed
+        if i < len(t_offsets) and not np.isnan(t_offsets[i]):
+            if end < int(t_offsets[i]) + 5:
+                end = int(t_offsets[i]) + 5
+                start = end - t_fixed
+
         if start < 0 or end > T:
             continue
 
-        # Natural boundaries: midpoints to neighbouring R-peaks
-        prev_r    = int(r_peaks[i - 1])
-        next_r    = int(r_peaks[i + 1])
-        nat_start = (r + prev_r) // 2
-        nat_end   = (r + next_r) // 2
-
-        # Build mask in window-local coordinates
-        mask = np.zeros(t_fixed, dtype=np.float32)
-        rel_s = int(np.clip(nat_start - start, 0, t_fixed))
-        rel_e = int(np.clip(nat_end   - start, 0, t_fixed))
-        if rel_e > rel_s:
-            mask[rel_s:rel_e] = 1.0
-
         subseq = _window(signal, start, end, t_fixed)
-        subseq = _masked_normalize_beat(subseq, mask)
+        if use_masked_norm:
+            prev_r    = int(r_peaks[i - 1])
+            next_r    = int(r_peaks[i + 1])
+            nat_start = (r + prev_r) // 2
+            nat_end   = (r + next_r) // 2
+            mask = np.zeros(t_fixed, dtype=np.float32)
+            rel_s = int(np.clip(nat_start - start, 0, t_fixed))
+            rel_e = int(np.clip(nat_end   - start, 0, t_fixed))
+            if rel_e > rel_s:
+                mask[rel_s:rel_e] = 1.0
+            subseq = _masked_normalize_beat(subseq, mask)
+        else:
+            subseq = z_normalize(subseq)
 
         concepts, weights = get_concept_labels(start, end, delineation, r_peaks, u_peaks)
         samples.append((subseq, 1, concepts, weights))
 
-    n_per_strategy = max(1, int(round(len(samples) / 4 * neg_oversample_factor)))
+    n_per_strategy = max(1, int(round(max(1, len(samples)) / 4 * neg_oversample_factor)))
 
-    def _znorm(s: np.ndarray) -> np.ndarray:
-        mean = s.mean(axis=-1, keepdims=True)
-        std  = s.std(axis=-1, keepdims=True) + 1e-8
-        return ((s - mean) / std).astype(np.float32)
-
-    # Strategy 1: early truncation
-    for _ in range(n_per_strategy):
-        if not len(r_peaks): break
-        r = int(r_peaks[rng.integers(0, len(r_peaks))])
-        start = r - beat_window_pre
-        cut   = r + int(rng.uniform(0.3, 0.6) * beat_window_post)
-        if start < 0 or cut > T: continue
-        subseq = _znorm(_window(signal, start, cut, t_fixed))
-        concepts, weights = get_concept_labels(start, cut, delineation, r_peaks, u_peaks)
-        samples.append((subseq, 0, concepts, weights))
-
-    # Strategy 2: late start
-    for _ in range(n_per_strategy):
-        if not len(r_peaks): break
-        r = int(r_peaks[rng.integers(0, len(r_peaks))])
-        late_start = r - rng.integers(0, beat_window_pre)
-        end        = r + beat_window_post
-        if late_start < 0 or end > T: continue
-        subseq = _znorm(_window(signal, late_start, end, t_fixed))
-        concepts, weights = get_concept_labels(late_start, end, delineation, r_peaks, u_peaks)
-        samples.append((subseq, 0, concepts, weights))
-
-    # Strategy 3: random crop (no R-peak)
-    for _ in range(n_per_strategy):
-        start = rng.integers(0, max(1, T - t_fixed))
-        end   = start + t_fixed
-        if end > T: continue
-        if any(start <= int(r) <= end for r in r_peaks): continue
-        subseq = _znorm(_window(signal, start, end, t_fixed))
+    # Strategy 1: early truncation — continuous t_fixed window ending right after R-peak (cuts off T/QT)
+    added = 0
+    for _ in range(n_per_strategy * 4):
+        if added >= n_per_strategy or not len(r_peaks):
+            break
+        r   = int(r_peaks[rng.integers(0, len(r_peaks))])
+        end = r + int(rng.integers(15, max(20, int(0.22 * t_fixed))))
+        start = end - t_fixed
+        if start < 0 or end > T:
+            continue
         concepts, weights = get_concept_labels(start, end, delineation, r_peaks, u_peaks)
+        if is_complete_heartbeat_window(concepts, weights):
+            continue
+        subseq = z_normalize(_window(signal, start, end, t_fixed))
         samples.append((subseq, 0, concepts, weights))
+        added += 1
 
-    # Strategy 4: inter-beat baseline
-    for _ in range(n_per_strategy):
-        if len(r_peaks) < 2: break
-        idx   = rng.integers(0, len(r_peaks) - 1)
+    # Strategy 2: late start — continuous t_fixed window starting at/after Q/R (cuts off P/PR/QRS-onset)
+    added = 0
+    for _ in range(n_per_strategy * 4):
+        if added >= n_per_strategy or not len(r_peaks):
+            break
+        r     = int(r_peaks[rng.integers(0, len(r_peaks))])
+        start = r + int(rng.integers(-20, 45))
+        end   = start + t_fixed
+        if start < 0 or end > T:
+            continue
+        concepts, weights = get_concept_labels(start, end, delineation, r_peaks, u_peaks)
+        if is_complete_heartbeat_window(concepts, weights):
+            continue
+        subseq = z_normalize(_window(signal, start, end, t_fixed))
+        samples.append((subseq, 0, concepts, weights))
+        added += 1
+
+    # Strategy 3: random crop containing no R-peak
+    added = 0
+    for _ in range(n_per_strategy * 6):
+        if added >= n_per_strategy or T < t_fixed:
+            break
+        start = int(rng.integers(0, max(1, T - t_fixed + 1)))
+        end   = start + t_fixed
+        if any(start <= int(r) <= end for r in r_peaks):
+            continue
+        concepts, weights = get_concept_labels(start, end, delineation, r_peaks, u_peaks)
+        subseq = z_normalize(_window(signal, start, end, t_fixed))
+        samples.append((subseq, 0, concepts, weights))
+        added += 1
+
+    # Strategy 4: inter-beat midpoint window (verified not to contain a full tachycardia beat)
+    added = 0
+    for _ in range(n_per_strategy * 4):
+        if added >= n_per_strategy or len(r_peaks) < 2:
+            break
+        idx   = int(rng.integers(0, len(r_peaks) - 1))
         mid   = (int(r_peaks[idx]) + int(r_peaks[idx + 1])) // 2
         start = mid - t_fixed // 2
-        end   = mid + t_fixed // 2
-        if start < 0 or end > T: continue
-        subseq = _znorm(_window(signal, start, end, t_fixed))
+        end   = start + t_fixed
+        if start < 0 or end > T:
+            continue
         concepts, weights = get_concept_labels(start, end, delineation, r_peaks, u_peaks)
+        if is_complete_heartbeat_window(concepts, weights):
+            continue
+        subseq = z_normalize(_window(signal, start, end, t_fixed))
         samples.append((subseq, 0, concepts, weights))
+        added += 1
 
     return samples
 
@@ -511,19 +608,19 @@ def extract_sliding_windows(
     t_fixed: int = 500,
     stride: int = 50,
 ) -> List[Tuple[np.ndarray, int, List[int], List[int]]]:
-    """Dense sliding window extraction. Label = 1 if full QT interval inside window."""
+    """Dense sliding window extraction with per-window z-normalisation and unified completeness label."""
     if not delin.get("quality_ok", False):
         return []
     C, T = signal.shape
-    r_peaks    = delin["r_peaks"]
+    r_peaks     = delin["r_peaks"]
     delineation = delin["delineation"]
-    u_peaks    = delin.get("u_peaks", np.array([]))
+    u_peaks     = delin.get("u_peaks", np.array([]))
     samples: list = []
     for start in range(0, T - t_fixed + 1, stride):
         end = start + t_fixed
-        subseq = signal[:, start:end].copy().astype(np.float32)
+        subseq = z_normalize(signal[:, start:end].astype(np.float32))
         concepts, weights = get_concept_labels(start, end, delineation, r_peaks, u_peaks)
-        task_label = int(concepts[7])   # c_QRS = heartbeat present
+        task_label = int(is_complete_heartbeat_window(concepts, weights))
         samples.append((subseq, task_label, concepts, weights))
     return samples
 
@@ -534,11 +631,7 @@ def extract_sliding_windows(
 
 class PTBXLDataset(Dataset):
     """
-    PTB-XL 12-lead ECG dataset.
-
-    Each item: {signal (C,T), age, sex, pathology (5,), concepts (20,), concept_mask (20,), record_id}
-
-    Use `PTBXLDataset.make_splits(data_path)` to get (train, val, test).
+    PTB-XL 12-lead ECG dataset for record-level diagnostic classification + 20 clinical concepts.
     """
 
     def __init__(
@@ -614,11 +707,11 @@ class PTBXLDataset(Dataset):
         row    = self.records.loc[ecg_id]
         try:
             signal, _ = wfdb.rdsamp(str(self.data_path / row[self.filename_col]))
-            signal = signal.T.astype(np.float32)                    # (12, T)
+            signal = signal.T.astype(np.float32)
         except Exception:
             T = 5000 if self.sampling_rate == 500 else 1000
             signal = np.zeros((12, T), dtype=np.float32)
-        signal = minmax_normalize(signal)
+        signal = z_normalize(bandpass_filter(signal, self.sampling_rate))
         if self.lead is not None:
             signal = signal[self.lead : self.lead + 1, :]
 
@@ -627,7 +720,7 @@ class PTBXLDataset(Dataset):
         pathology = row["pathology"].astype(np.float32)
 
         if self.concepts_df is not None and ecg_id in self.concepts_df.index:
-            raw_c = self.concepts_df.loc[ecg_id, CONCEPT_COLUMNS].values.astype(np.float32)
+            raw_c = self.concepts_df.reindex(columns=CONCEPT_COLUMNS).loc[ecg_id].values.astype(np.float32)
         else:
             raw_c = np.full(NUM_RECORD_CONCEPTS, np.nan, dtype=np.float32)
         mask     = ~np.isnan(raw_c)
@@ -651,11 +744,7 @@ class PTBXLDataset(Dataset):
 class HeartbeatDataset(Dataset):
     """
     Beat-level dataset for heartbeat completeness classification.
-
-    Each item: {signal (C,T), task_label, concept_labels (10,), concept_weights (10,), record_id}
-
-    Build with `HeartbeatDataset.from_records(data_path)` (slow; uses neurokit2).
-    Cache with `ds.save_cache(dir, split)` / `HeartbeatDataset.from_cache(dir, split)`.
+    Each item: {signal (C,T), task_label, concept_labels (K,), concept_weights (K,), record_id}
     """
 
     def __init__(
@@ -702,17 +791,31 @@ class HeartbeatDataset(Dataset):
         }
 
     def label_distribution(self) -> dict:
-        labels = [s["task_label"] for s in self.samples]
+        labels = [int(s["task_label"]) for s in self.samples]
         n1 = sum(labels)
         return {"complete": n1, "incomplete": len(labels) - n1, "total": len(labels)}
 
-    # ── Persistence ──────────────────────────────────────────────────────────
+    def apply_config_views(self, cfg: dict) -> "HeartbeatDataset":
+        """Apply model_lead / model_leads / active_concepts from config in-place."""
+        data_cfg = cfg.get("data", {})
+        model_leads = data_cfg.get("model_leads", None)
+        model_lead  = data_cfg.get("model_lead", None)
+        if model_leads is not None:
+            self.model_leads = model_leads
+        elif model_lead is not None:
+            self.model_lead = model_lead
+        active_concepts = cfg.get("active_concepts", None)
+        if active_concepts is not None:
+            self.active_concepts = active_concepts
+        return self
 
-    def save_cache(self, cache_dir: str | Path, split: str) -> None:
+    def save_cache(self, cache_dir: str | Path, split: str, meta: Optional[dict] = None) -> None:
         cache_dir = Path(cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
         with open(cache_dir / f"{split}.pkl", "wb") as f:
             pickle.dump(self.samples, f, protocol=pickle.HIGHEST_PROTOCOL)
+        if meta is not None:
+            (cache_dir / "cache_meta.json").write_text(json.dumps(meta, indent=2))
         logger.info(f"Saved {split} cache ({len(self.samples)} samples) → {cache_dir}")
 
     @classmethod
@@ -723,16 +826,14 @@ class HeartbeatDataset(Dataset):
         logger.info(f"Loaded {split} cache ({len(samples)} samples) from {path}")
         return cls(samples)
 
-    # ── Full build from raw PTB-XL records ───────────────────────────────────
-
     @classmethod
     def from_records(
         cls,
         data_path: str | Path = PTBXL_ROOT,
         sampling_rate: int = 500,
         t_fixed: int = 500,
-        beat_window_pre: int = 100,
-        beat_window_post: int = 400,
+        beat_window_pre: int = 250,
+        beat_window_post: int = 250,
         delineation_cache_dir: Optional[str | Path] = None,
         val_fold: int = 9,
         test_fold: int = 10,
@@ -740,17 +841,28 @@ class HeartbeatDataset(Dataset):
         neg_oversample_factor: float = 1.0,
         use_sliding_window: bool = False,
         stride: int = 50,
+        pos_jitter: int = 60,
+        use_masked_norm: bool = False,
         seed: int = 42,
+        build_workers: int = 16,
+        delineator: str = "neurokit2",
+        soft_seg_path: Optional[str | Path] = None,
     ) -> Tuple["HeartbeatDataset", "HeartbeatDataset", "HeartbeatDataset"]:
-        """
-        Build train/val/test from PTB-XL.
-        Preprocesses (bandpass + z-normalise), delineates (neurokit2), extracts beats.
-        Uses delineation_cache_dir to persist intermediate results (recommended).
-        """
+        """Build train/val/test splits from raw PTB-XL records (parallelised over I/O)."""
+        from concurrent.futures import ThreadPoolExecutor
+
         data_path = Path(data_path)
-        rng       = np.random.default_rng(seed)
         meta      = pd.read_csv(data_path / "ptbxl_database.csv", index_col="ecg_id")
         filename_col = "filename_hr" if sampling_rate == 500 else "filename_lr"
+        if delineation_cache_dir is not None:
+            Path(delineation_cache_dir).mkdir(parents=True, exist_ok=True)
+
+        soft_seg_archive = None
+        if delineator == "soft_seg":
+            from soft_seg import SoftSegArchive, extract_fiducials_from_soft_seg
+            ss_path = Path(soft_seg_path) if soft_seg_path else (data_path.parent / "ptbxl_segmentations_8bit.zip")
+            soft_seg_archive = SoftSegArchive(ss_path)
+            logger.info(f"Using Zenodo 7610236 (ECGdeli U-Net) soft segmentations from {ss_path} ({len(soft_seg_archive)} records)")
 
         train_folds = [f for f in range(1, 11) if f not in (val_fold, test_fold)]
         splits = {
@@ -760,37 +872,59 @@ class HeartbeatDataset(Dataset):
         }
         all_samples: Dict[str, list] = {k: [] for k in splits}
 
-        for split_name, subset in splits.items():
-            logger.info(f"Processing {split_name} ({len(subset)} records)…")
-            for ecg_id, row in tqdm(subset.iterrows(), total=len(subset), desc=split_name):
-                try:
-                    raw, _ = wfdb.rdsamp(str(data_path / row[filename_col]))
+        def _process_one(item):
+            ecg_id, rel_fn = item
+            rec_rng = np.random.default_rng(seed + int(ecg_id))
+            try:
+                if soft_seg_archive is not None:
+                    if ecg_id not in soft_seg_archive:
+                        return []
+                    soft_seg = soft_seg_archive.load(ecg_id)
+                    delin_result = extract_fiducials_from_soft_seg(soft_seg, lead_idx=lead_idx)
+                    if not delin_result.get("quality_ok", False):
+                        return []
+                    raw, _ = wfdb.rdsamp(str(data_path / rel_fn))
                     signal = bandpass_filter(raw.T.astype(np.float32), sampling_rate)
-                    # No record-level z-normalisation — per-beat masked normalisation
-                    # is applied inside extract_beats for positives.
-
+                else:
+                    raw, _ = wfdb.rdsamp(str(data_path / rel_fn))
+                    signal = bandpass_filter(raw.T.astype(np.float32), sampling_rate)
                     delin_result = _load_or_compute_delin(
                         ecg_id, signal, sampling_rate, lead_idx, delineation_cache_dir
                     )
+                if use_sliding_window:
+                    beats = extract_sliding_windows(signal, delin_result, t_fixed, stride)
+                else:
+                    beats = extract_beats(
+                        signal, delin_result, t_fixed,
+                        beat_window_pre, beat_window_post,
+                        neg_oversample_factor, rec_rng,
+                        pos_jitter=pos_jitter,
+                        use_masked_norm=use_masked_norm,
+                    )
+                return [
+                    {
+                        "signal":          subseq,
+                        "task_label":      task_label,
+                        "concept_labels":  concepts,
+                        "concept_weights": weights,
+                        "record_id":       int(ecg_id),
+                    }
+                    for subseq, task_label, concepts, weights in beats
+                ]
+            except Exception as e:
+                logger.warning(f"Skipped ecg_id={ecg_id}: {e}")
+                return []
 
-                    if use_sliding_window:
-                        beats = extract_sliding_windows(signal, delin_result, t_fixed, stride)
-                    else:
-                        beats = extract_beats(
-                            signal, delin_result, t_fixed,
-                            beat_window_pre, beat_window_post, neg_oversample_factor, rng,
-                        )
-
-                    for subseq, task_label, concepts, weights in beats:
-                        all_samples[split_name].append({
-                            "signal":          subseq,
-                            "task_label":      task_label,
-                            "concept_labels":  concepts,
-                            "concept_weights": weights,
-                            "record_id":       int(ecg_id),
-                        })
-                except Exception as e:
-                    logger.warning(f"Skipped ecg_id={ecg_id}: {e}")
+        try:
+            for split_name, subset in splits.items():
+                items = list(zip(subset.index.tolist(), subset[filename_col].tolist()))
+                logger.info(f"Processing {split_name} ({len(items)} records, delineator={delineator}, workers={build_workers})…")
+                with ThreadPoolExecutor(max_workers=max(1, build_workers)) as pool:
+                    for rec_samples in tqdm(pool.map(_process_one, items), total=len(items), desc=split_name):
+                        all_samples[split_name].extend(rec_samples)
+        finally:
+            if soft_seg_archive is not None:
+                soft_seg_archive.close()
 
         return (
             cls(all_samples["train"]),
@@ -807,9 +941,7 @@ def _load_or_compute_delin(
     cache_dir: Optional[Path],
 ) -> dict:
     if cache_dir is not None:
-        cache_dir = Path(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / f"{ecg_id}.pkl"
+        cache_file = Path(cache_dir) / f"{ecg_id}.pkl"
         if cache_file.exists():
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
@@ -817,9 +949,92 @@ def _load_or_compute_delin(
     result = delineate_record(signal, sampling_rate, lead_idx)
 
     if cache_dir is not None:
-        with open(cache_dir / f"{ecg_id}.pkl", "wb") as f:
+        cdir = Path(cache_dir)
+        cdir.mkdir(parents=True, exist_ok=True)
+        with open(cdir / f"{ecg_id}.pkl", "wb") as f:
             pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
     return result
+
+
+def load_or_build_datasets(
+    cfg: dict,
+    splits: Tuple[str, ...] = ("train", "val", "test"),
+) -> Dict[str, HeartbeatDataset]:
+    """
+    Unified dataset loader with config-fingerprinted caching.
+
+    - Stores new caches under `<checkpoint_dir>/dataset_cache/<config_hash>/` so changing
+      `lead`, `use_sliding_window`, `use_masked_norm`, etc. never silently loads stale data.
+    - Falls back to legacy `<checkpoint_dir>/dataset_cache/<split>.pkl` when evaluating
+      older runs whose config lacks `use_masked_norm` and `pos_jitter`.
+    """
+    data_cfg  = cfg.get("data", {})
+    train_cfg = cfg.get("training", {})
+    base_cache = Path(train_cfg.get("checkpoint_dir", "checkpoints")) / "dataset_cache"
+
+    is_legacy_cfg = ("use_masked_norm" not in data_cfg) and ("pos_jitter" not in data_cfg)
+    cache_key, spec = dataset_cache_key(data_cfg)
+    keyed_cache = base_cache / cache_key
+
+    # Check keyed cache first, then legacy root cache for legacy run configs
+    if all((keyed_cache / f"{s}.pkl").exists() for s in splits):
+        target_cache = keyed_cache
+        need_build = False
+    elif is_legacy_cfg and all((base_cache / f"{s}.pkl").exists() for s in splits):
+        logger.info(f"Using legacy dataset cache at {base_cache} for legacy run config.")
+        target_cache = base_cache
+        need_build = False
+    else:
+        target_cache = keyed_cache
+        need_build = True
+
+    if not need_build:
+        out = {s: HeartbeatDataset.from_cache(target_cache, s).apply_config_views(cfg) for s in splits}
+        return out
+
+    data_path, _ = resolve_data_paths(cfg)
+    lead_idx = int(data_cfg.get("lead", 1))
+    sr       = int(data_cfg.get("sampling_rate", 500))
+    # Reuse legacy `delineation/` cache if lead==0 and sr==500, otherwise lead-specific dir
+    legacy_delin = base_cache / "delineation"
+    if lead_idx == 0 and sr == 500 and legacy_delin.exists():
+        delin_dir = legacy_delin
+    else:
+        delin_dir = base_cache / f"delineation_sr{sr}_lead{lead_idx}"
+
+    delineator = str(data_cfg.get("delineator", "neurokit2")).lower()
+    raw_ss = data_cfg.get("soft_seg_path", None)
+    if raw_ss:
+        data_dir = data_cfg.get("data_dir", None)
+        ss_path = Path(raw_ss) if Path(raw_ss).is_absolute() or not data_dir else (Path(data_dir) / raw_ss)
+    else:
+        ss_path = None
+
+    logger.info(f"Building dataset (cache key={cache_key}, delineator={delineator}) from {data_path}…")
+    train_ds, val_ds, test_ds = HeartbeatDataset.from_records(
+        data_path             = data_path,
+        sampling_rate         = sr,
+        t_fixed               = int(data_cfg.get("t_fixed", 500)),
+        beat_window_pre       = int(data_cfg.get("beat_window_pre", 250)),
+        beat_window_post      = int(data_cfg.get("beat_window_post", 250)),
+        delineation_cache_dir = delin_dir,
+        val_fold              = int(data_cfg.get("val_fold", 9)),
+        test_fold             = int(data_cfg.get("test_fold", 10)),
+        lead_idx              = lead_idx,
+        neg_oversample_factor = float(data_cfg.get("neg_oversample_factor", 1.0)),
+        use_sliding_window    = bool(data_cfg.get("use_sliding_window", False)),
+        stride                = int(data_cfg.get("stride", 50)),
+        pos_jitter            = int(data_cfg.get("pos_jitter", 60)),
+        use_masked_norm       = bool(data_cfg.get("use_masked_norm", False)),
+        delineator            = delineator,
+        soft_seg_path         = ss_path,
+    )
+    built = {"train": train_ds, "val": val_ds, "test": test_ds}
+    for sp_name, ds_obj in built.items():
+        ds_obj.save_cache(keyed_cache, sp_name, meta=spec)
+        ds_obj.apply_config_views(cfg)
+
+    return {s: built[s] for s in splits}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -833,8 +1048,12 @@ def make_dataloaders(
     batch_size: int = 256,
     num_workers: int = 4,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    common = dict(batch_size=batch_size, num_workers=num_workers, pin_memory=True,
-                  persistent_workers=num_workers > 0)
+    common = dict(
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        persistent_workers=num_workers > 0,
+    )
     return (
         DataLoader(train_ds, shuffle=True,  **common),
         DataLoader(val_ds,   shuffle=False, **common),

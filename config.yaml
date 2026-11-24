@@ -1,36 +1,50 @@
-# config.yaml — Unified configuration for the ECG heartbeat CBM
-# Run: python train.py [--config config.yaml] [--run-dir runs/my_run]
+# config.yaml — Unified configuration for the ECG heartbeat CBM / CEM, Explorer, and notebook
+# Run: python src/train.py [--config config.yaml] [--run-dir models/my_run]
 
 data:
-  data_dir: "/nfs/data8/schlegel/git/ecg-cbm/data"   # <-- only path you need to change
+  data_dir: "/nfs/data8/schlegel/git/ecg-cbm/data"   # <-- base data directory
   data_path: "ptb-xl"              # relative to data_dir (or absolute to override)
   concept_file: "concepts.parquet" # relative to data_dir (or absolute to override)
+  delineator: "neurokit2"          # "neurokit2" | "soft_seg" (Zenodo 7610236 / ECGdeli U-Net)
+  soft_seg_path: "ptbxl_segmentations_8bit.zip" # relative to data_dir (used when delineator=soft_seg)
   sampling_rate: 500            # 500 or 100 Hz
   t_fixed: 500                  # samples per beat subsequence (1 s at 500 Hz)
-  lead: 0                       # lead index for delineation (1 = Lead II)
+  lead: 0                       # lead index for delineation (0 = Lead I, 1 = Lead II)
   val_fold: 9
   test_fold: 10
   batch_size: 256
   num_workers: 4
-  beat_window_pre: 250          # samples before R-peak  (= t_fixed // 2, symmetric)
-  beat_window_post: 250         # samples after R-peak   (= t_fixed // 2, symmetric)
+  beat_window_pre: 250          # samples before R-peak for windowing
+  beat_window_post: 250         # samples after R-peak for windowing
+  pos_jitter: 60                # random R-peak offset jitter on positives (0 = fixed centre)
+  use_masked_norm: false        # false = uniform per-window z-norm (avoids zero-padding shortcut)
   neg_oversample_factor: 1.0    # >1 increases negatives per strategy
-  use_sliding_window: false     # true → dense sliding-window negatives
+  use_sliding_window: false     # true → dense sliding-window extraction
   stride: 50                    # stride for sliding window mode
   # model_lead: null            # set to int for single-lead input  (e.g. 1)
   # model_leads: null           # set to list for multi-lead subset (e.g. [0, 1, 6])
 
 model:
+  type: "cbm"                   # "cbm" | "cem" (Concept Embedding Model) | "blackbox"
   encoder:
     in_channels: 12             # overridden by model_lead / model_leads
     base_channels: 64           # latent_dim = base_channels * 8 = 512
     dropout: 0.2
   concept_layer:
     num_concepts: 10            # [P, Q, R, S, T, U, PR, QRS, ST, QT]
+    emb_size: 16                # per-concept embedding dimension (used when model.type == "cem")
+    rand_int_prob: 0.25         # random concept intervention prob during training (CBM & CEM RandInt)
+    mask_unsupervised_concepts: true  # zero unsupervised concepts (e.g. U-wave under soft_seg) before classifier
+  classifier:
+    use_uncertainty: true       # pass concept variance into CBM task head
+    detach_uncertainty: true    # detach variance before task head to prevent side-channel leakage
   mc_dropout_rate: 0.1          # dropout on z for epistemic uncertainty
 
 training:
+  seed: 42
+  mode: "joint"                 # "joint" | "sequential" | "independent"
   epochs: 100
+  stage1_epochs: 50             # concept-stage epochs when mode is "sequential" or "independent"
   lr: 1.0e-3
   weight_decay: 1.0e-4
   min_lr: 1.0e-5                # cosine annealing lower bound
@@ -38,17 +52,19 @@ training:
   lambda_concept_end: 0.3
   lambda_concept_anneal_epochs: 50
   lambda_consist: 0.1
+  var_reg_weight: 1.0e-3        # L2 regularisation on concept log-variances
   use_heteroscedastic_loss: true
   n_mc_samples: 10
   reliable_concepts: [2, 4, 7, 9]   # R=2, T=4, QRS=7, QT=9
   label_smooth_reliable: 0.02
   label_smooth_noisy: 0.10
   early_stopping_patience: 15
+  monitor: "val_loss"           # "val_loss" | "val_acc"
   checkpoint_dir: "checkpoints"
-  log_dir: "runs"
+  log_dir: "models"
 
 augmentation:
-  temporal_jitter: 10
+  temporal_jitter: 15
   amplitude_scale_min: 0.8
   amplitude_scale_max: 1.2
   noise_std: 0.01
@@ -56,3 +72,11 @@ augmentation:
   lead_dropout_max: 2
 
 concept_names: ["P", "Q", "R", "S", "T", "U", "PR", "QRS", "ST", "QT"]
+
+# Default trained model directories (relative to repo root, used by Explorer & cbm_inference.ipynb)
+inference:
+  run_dir: "models/cem_softseg"
+  cbm_run_dir: "models/cbm_softseg"
+  cem_run_dir: "models/cem_softseg"
+  dense_cbm_run_dir: "models/dense_cbm_softseg"
+  dense_cem_run_dir: "models/dense_cem_softseg"

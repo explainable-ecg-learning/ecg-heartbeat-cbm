@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the ECG Heartbeat CBM Explorer.
-# Usage: ./explorer/run.sh [8000] [0.0.0.0]
+# Usage: ./explorer/run.sh [8040] [127.0.0.1]
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,7 +11,7 @@ if [[ ! -d "$VENV" ]]; then
   exit 1
 fi
 
-PORT="${1:-8000}"
+PORT="${1:-8040}"
 HOST="${2:-127.0.0.1}"
 
 echo "Starting ECG CBM Explorer at http://${HOST}:${PORT}"

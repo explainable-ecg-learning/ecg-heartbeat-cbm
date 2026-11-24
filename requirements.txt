@@ -12,3 +12,8 @@ matplotlib
 PyYAML
 tqdm
 pyarrow
+fastapi
+uvicorn
+pydantic
+tomli; python_version < "3.11"
+pytest
