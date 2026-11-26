@@ -38,13 +38,94 @@ async function _loadStaticExternalBenchmark() {
   return _staticExtBenchPromise;
 }
 
+function _unpackStaticRecord(raw) {
+  if (!raw || raw._unpacked) return raw;
+  raw._unpacked = true;
+
+  // 1. Dequantize sweep arrays & materialize Black-Box zero arrays in RAM
+  Object.values(raw.sweeps || {}).forEach(sw => {
+    const N = (sw.task_probs || []).length;
+    const K = (sw.concept_names || []).length;
+    if (sw.concept_probs === null) {
+      sw.concept_probs   = Array.from({ length: N }, () => new Array(K).fill(0));
+      sw.concept_stds    = Array.from({ length: N }, () => new Array(K).fill(0));
+      sw.concept_stds_mc = Array.from({ length: N }, () => new Array(K).fill(0));
+    } else if (sw._cstd_scale) {
+      const inv = 1.0 / sw._cstd_scale;
+      if (sw.concept_stds)    sw.concept_stds    = sw.concept_stds.map(row => row.map(v => v * inv));
+      if (sw.concept_stds_mc) sw.concept_stds_mc = sw.concept_stds_mc.map(row => row.map(v => v * inv));
+    }
+  });
+
+  // 2. Dequantize dense Zenodo GT probabilities & reconstruct record.soft_seg without duplicating JSON bytes
+  const gtScale = raw.dense_prob_scale || 0;
+  if (gtScale > 0 && raw.dense_gt_probs) {
+    const inv = 1.0 / gtScale;
+    const nonTp = ["P", "PQ", "QRS", "ST", "T"].filter(k => Array.isArray(raw.dense_gt_probs[k]));
+    nonTp.forEach(k => { raw.dense_gt_probs[k] = raw.dense_gt_probs[k].map(v => v * inv); });
+    const Tseg = nonTp.length ? raw.dense_gt_probs[nonTp[0]].length : 0;
+    if (Tseg > 0 && !raw.dense_gt_probs.TP) {
+      const tp = new Array(Tseg);
+      for (let t = 0; t < Tseg; t++) {
+        let s = 0.0;
+        for (let i = 0; i < nonTp.length; i++) s += raw.dense_gt_probs[nonTp[i]][t];
+        tp[t] = Math.max(0.0, 1.0 - s);
+      }
+      raw.dense_gt_probs.TP = tp;
+    }
+  }
+  if (raw.record && !raw.record.soft_seg && raw.dense_gt_probs) {
+    raw.record.soft_seg = { ...raw.dense_gt_probs, sampling_rate: 100 };
+  }
+
+  // 3. Dequantize dense segmentation models
+  Object.values(raw.dense || {}).forEach(de => {
+    if (!de || !de.has_seg) return;
+    const cNames = de.concept_names || ["P", "PQ", "QRS", "ST", "T", "TP"];
+    const nonTp  = cNames.filter(n => n !== "TP");
+    const pScale = de._prob_scale || 0;
+    const sScale = de._std_scale || 0;
+    if (pScale > 0 && de.concept_probs) {
+      const invP = 1.0 / pScale;
+      nonTp.forEach(n => {
+        if (Array.isArray(de.concept_probs[n])) de.concept_probs[n] = de.concept_probs[n].map(v => v * invP);
+      });
+      const Tseg = nonTp.length && de.concept_probs[nonTp[0]] ? de.concept_probs[nonTp[0]].length : 0;
+      if (Tseg > 0 && cNames.includes("TP") && !de.concept_probs.TP) {
+        const tp = new Array(Tseg);
+        for (let t = 0; t < Tseg; t++) {
+          let s = 0.0;
+          for (let i = 0; i < nonTp.length; i++) s += de.concept_probs[nonTp[i]][t];
+          tp[t] = Math.max(0.0, 1.0 - s);
+        }
+        de.concept_probs.TP = tp;
+      }
+      if (de.concept_stds) {
+        nonTp.forEach(n => {
+          if (Array.isArray(de.concept_stds[n])) de.concept_stds[n] = de.concept_stds[n].map(v => v * invP);
+        });
+        if (Tseg > 0 && cNames.includes("TP") && !de.concept_stds.TP) {
+          de.concept_stds.TP = new Array(Tseg).fill(0.0);
+        }
+      }
+    }
+    if (sScale > 0) {
+      const invS = 1.0 / sScale;
+      if (Array.isArray(de.mean_std_timeline))    de.mean_std_timeline    = de.mean_std_timeline.map(v => v * invS);
+      if (Array.isArray(de.mean_std_timeline_mc)) de.mean_std_timeline_mc = de.mean_std_timeline_mc.map(v => v * invS);
+    }
+  });
+
+  return raw;
+}
+
 async function _loadStaticRecord(dataset, ecgId) {
   const key = `${dataset}_${ecgId}`;
   if (!_staticRecordCache.has(key)) {
     const p = fetch(`./data/records/${encodeURIComponent(key)}.json`).then(r => {
       if (!r.ok) throw new Error(`Static record ${key} HTTP ${r.status}`);
       return r.json();
-    });
+    }).then(_unpackStaticRecord);
     _staticRecordCache.set(key, p);
   }
   return _staticRecordCache.get(key);
@@ -59,15 +140,18 @@ function _nearestIdx(arr, target) {
   return best;
 }
 
-function _evalStaticWindowInfer(sw, head, ni, interventions) {
+function _evalStaticWindowInfer(sw, head, ni, interventions, includeEpistemic = false) {
   const cProbs = [...sw.concept_probs[ni]];
-  const cStds  = [...sw.concept_stds[ni]];
+  const cStdSrc = (includeEpistemic && sw.concept_stds_mc) ? sw.concept_stds_mc[ni] : sw.concept_stds[ni];
+  const cStds  = [...cStdSrc];
+  const tStd   = (includeEpistemic && sw.task_stds_mc) ? sw.task_stds_mc[ni] : sw.task_stds[ni];
+  const tEpi   = (includeEpistemic && sw.task_epistemic_mc) ? sw.task_epistemic_mc[ni] : 0.0;
   const hasInt = Boolean(interventions && Object.keys(interventions).length > 0);
   if (!hasInt || !head || head.model_type === "blackbox") {
     return {
       task_prob:      sw.task_probs[ni],
-      task_std:       sw.task_stds[ni],
-      task_epistemic: 0.0,
+      task_std:       tStd,
+      task_epistemic: tEpi,
       task_aleatoric: sw.task_stds[ni],
       concept_probs:  cProbs,
       concept_stds:   cStds,
@@ -124,7 +208,7 @@ function _evalStaticWindowInfer(sw, head, ni, interventions) {
   };
 }
 
-function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConcepts) {
+function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConcepts, intSpan = null) {
   const de = rec.dense?.[modelId];
   if (!de) return null;
   if (!de.has_seg) {
@@ -136,6 +220,7 @@ function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConc
       concept_names:          de.concept_names,
       concept_probs:          null,
       concept_stds:           null,
+      seg_spans:              null,
       mean_std_timeline:      null,
       intervals:              null,
       pathology:              de.base_pathology,
@@ -145,28 +230,49 @@ function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConc
   }
 
   const cNames = de.concept_names || ["P", "PQ", "QRS", "ST", "T", "TP"];
-  let cpOut = {};
+  const cpOut  = {};
   cNames.forEach(n => { cpOut[n] = [...de.concept_probs[n]]; });
-  let csOut = de.concept_stds ? {} : null;
+  const csOut = de.concept_stds ? {} : null;
   if (csOut) cNames.forEach(n => { csOut[n] = [...de.concept_stds[n]]; });
-  let stdLine = [...((includeEpistemic && de.mean_std_timeline_mc) ? de.mean_std_timeline_mc : de.mean_std_timeline)];
+  const stdLine = [...((includeEpistemic && de.mean_std_timeline_mc) ? de.mean_std_timeline_mc : de.mean_std_timeline)];
   let patho = { ...de.base_pathology };
 
   const mode = (intMode || "").toLowerCase();
+  const T = cpOut[cNames[0]]?.length || 0;
+  const isWinSpan = Array.isArray(intSpan) && intSpan.length === 2;
+  const lo = isWinSpan ? Math.max(0, Math.min(T, Math.round(intSpan[0]))) : 0;
+  const hi = isWinSpan ? Math.max(lo, Math.min(T, Math.round(intSpan[1]))) : T;
+  const binIdx = isWinSpan ? Math.max(0, Math.min(9, Math.floor((lo + hi) / 200))) : -1;
+  const pathoKeys = Object.keys(de.base_pathology || {});
+
+  const _mapWinPatho = arr => {
+    const mapped = {};
+    pathoKeys.forEach((name, idx) => { mapped[name] = Number(arr[idx]); });
+    return mapped;
+  };
+
   if (de.supports_interventions && mode) {
-    if (mode === "gt" && rec.dense_gt_probs && de.interventions?.gt) {
-      patho = { ...de.interventions.gt };
-      cpOut = {};
-      cNames.forEach(n => { cpOut[n] = [...rec.dense_gt_probs[n]]; });
-      if (csOut) cNames.forEach(n => { csOut[n] = csOut[n].map(() => 0); });
-      stdLine = stdLine.map(() => 0);
+    if (mode === "gt" && rec.dense_gt_probs) {
+      if (binIdx >= 0 && de.interventions_win?.gt?.[binIdx]) {
+        patho = _mapWinPatho(de.interventions_win.gt[binIdx]);
+      } else if (de.interventions?.gt) {
+        patho = { ...de.interventions.gt };
+      }
+      for (let t = lo; t < hi; t++) {
+        cNames.forEach(n => { cpOut[n][t] = rec.dense_gt_probs[n][t]; });
+        if (csOut) cNames.forEach(n => { csOut[n][t] = 0; });
+        stdLine[t] = 0;
+      }
     } else if ((mode === "ablate" || mode === "force") && intConcepts?.length) {
       const target = intConcepts[0];
       const ikey = `${mode}:${target}`;
-      if (de.interventions?.[ikey]) patho = { ...de.interventions[ikey] };
-      const T = cpOut[cNames[0]]?.length || 0;
+      if (binIdx >= 0 && de.interventions_win?.[ikey]?.[binIdx]) {
+        patho = _mapWinPatho(de.interventions_win[ikey][binIdx]);
+      } else if (de.interventions?.[ikey]) {
+        patho = { ...de.interventions[ikey] };
+      }
       if (mode === "ablate" && cpOut[target]) {
-        for (let t = 0; t < T; t++) {
+        for (let t = lo; t < hi; t++) {
           cpOut[target][t] = 0.0;
           let sum = 0.0;
           cNames.forEach(n => { sum += cpOut[n][t]; });
@@ -175,7 +281,7 @@ function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConc
           if (csOut?.[target]) csOut[target][t] = 0.0;
         }
       } else if (mode === "force" && cpOut[target]) {
-        for (let t = 0; t < T; t++) {
+        for (let t = lo; t < hi; t++) {
           cNames.forEach(n => { cpOut[n][t] = n === target ? 1.0 : 0.0; });
           if (csOut) cNames.forEach(n => { csOut[n][t] = 0.0; });
           stdLine[t] = 0.0;
@@ -192,6 +298,7 @@ function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConc
     concept_names:          cNames,
     concept_probs:          cpOut,
     concept_stds:           csOut,
+    seg_spans:              mode ? null : (de.seg_spans || null),
     mean_std_timeline:      stdLine,
     intervals:              de.intervals || null,
     pathology:              patho,
@@ -200,7 +307,44 @@ function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConc
   };
 }
 
+let _globalLoadCount = 0;
+
+function beginGlobalLoad() {
+  _globalLoadCount += 1;
+  document.getElementById("global-loading-bar")?.classList.add("active");
+}
+
+function endGlobalLoad() {
+  _globalLoadCount = Math.max(0, _globalLoadCount - 1);
+  if (_globalLoadCount === 0) {
+    document.getElementById("global-loading-bar")?.classList.remove("active");
+  }
+}
+
+function setSectionLoading(sectionId, loading) {
+  const el = document.getElementById(sectionId);
+  if (el) el.classList.toggle("is-loading", Boolean(loading));
+}
+
+function setLoadingPill(pillId, loading, text = null) {
+  const el = document.getElementById(pillId);
+  if (!el) return;
+  if (text !== null && el.lastElementChild) {
+    el.lastElementChild.textContent = text;
+  }
+  el.style.display = loading ? "" : "none";
+}
+
 async function apiGet(path) {
+  beginGlobalLoad();
+  try {
+    return await _apiGetInner(path);
+  } finally {
+    endGlobalLoad();
+  }
+}
+
+async function _apiGetInner(path) {
   if (!STATIC_MODE) {
     const res = await fetch(`${API}${path}`);
     if (!res.ok) throw new Error(await res.text());
@@ -260,6 +404,15 @@ async function apiGet(path) {
 }
 
 async function apiPost(path, body) {
+  beginGlobalLoad();
+  try {
+    return await _apiPostInner(path, body);
+  } finally {
+    endGlobalLoad();
+  }
+}
+
+async function _apiPostInner(path, body) {
   if (!STATIC_MODE) {
     const res = await fetch(`${API}${path}`, {
       method:  "POST",
@@ -309,7 +462,7 @@ async function apiPost(path, body) {
     const sw = rec.sweeps[mid];
     const head = manifest.window_heads[mid];
     const ni = _nearestIdx(sw.starts, body.start);
-    const prim = _evalStaticWindowInfer(sw, head, ni, body.interventions);
+    const prim = _evalStaticWindowInfer(sw, head, ni, body.interventions, Boolean(body.include_epistemic));
     const out = {
       ecg_id:        body.ecg_id,
       dataset:       ds,
@@ -326,28 +479,33 @@ async function apiPost(path, body) {
       out.compare = {
         model_id:   cid,
         model_type: csw.model_type,
-        ..._evalStaticWindowInfer(csw, manifest.window_heads[cid], ni, body.interventions),
+        ..._evalStaticWindowInfer(csw, manifest.window_heads[cid], ni, body.interventions, Boolean(body.include_epistemic)),
       };
     }
     return out;
   }
   if (path === "/dense-infer") {
     const mid = body.model_id || manifest.dense_models.default_model;
-    const prim = _buildStaticDenseEntry(rec, mid, body.include_epistemic, body.intervene_mode, body.intervene_concepts);
+    const prim = _buildStaticDenseEntry(
+      rec, mid, body.include_epistemic, body.intervene_mode, body.intervene_concepts, body.intervene_span || null
+    );
     const out = {
       ecg_id:         body.ecg_id,
       dataset:        ds,
       sampling_rate:  100,
       gt_probs:       rec.dense_gt_probs || null,
+      gt_spans:       rec.dense_gt_spans || null,
       intervene_mode: body.intervene_mode || null,
       ...prim,
     };
     if (body.compare_model_id) {
-      const cmp = _buildStaticDenseEntry(rec, body.compare_model_id, body.include_epistemic, body.intervene_mode, body.intervene_concepts);
+      const cmp = _buildStaticDenseEntry(
+        rec, body.compare_model_id, body.include_epistemic, body.intervene_mode, body.intervene_concepts, body.intervene_span || null
+      );
       if (cmp) out.compare = cmp;
     }
     if (body.blackbox_model_id) {
-      const bb = _buildStaticDenseEntry(rec, body.blackbox_model_id, body.include_epistemic, null, null);
+      const bb = _buildStaticDenseEntry(rec, body.blackbox_model_id, body.include_epistemic, null, null, null);
       if (bb) out.blackbox = bb;
     }
     return out;
@@ -372,6 +530,8 @@ const state = {
   models:         [],
   datasets:       [],
   dataset:        "ptbxl",
+  denseBenchDataset: "ptbxl",
+  activePreset:   "ptbxl_norm",
   hasSoftSegGt:   true,
   externalBenchmark: null,
   primaryModel:   null,
@@ -457,16 +617,16 @@ async function init() {
     }
     const scopeSel = document.getElementById("dense-int-scope");
     if (scopeSel) {
-      const wOpt = scopeSel.querySelector('option[value="window"]');
-      if (wOpt) wOpt.disabled = true;
-      scopeSel.value = "record";
-      scopeSel.title = "Window-scoped dense intervention requires a live FastAPI backend (?api=...); full 10s record interventions are exact & precomputed";
+      scopeSel.title = "Full 10s record interventions are exact; Selected 1.0s Window uses the nearest precomputed 1.0s bin in static mode";
     }
   }
 
   await loadModels();
   await loadDenseModels();
   applyDatasetControls(false);
+  renderExternalComparisonTable();
+  setupPresetButtons();
+  setupStoryScrollSpy();
   await loadRecordList();
   await refreshBenchmarks();
 
@@ -475,6 +635,197 @@ async function init() {
   if (recSel.options.length > 0 && recSel.value) {
     await loadCurrentRecord();
   }
+  prefetchPresetRecords();
+}
+
+function prefetchPresetRecords() {
+  if (!STATIC_MODE) return;
+  const targets = [
+    ["ptbxl", 8215],
+    ["georgia", "E00021"],
+    ["georgia", "E00005"],
+    ["georgia", "E10019"],
+    ["georgia", "E00067"],
+    ["georgia", "E00006"],
+  ];
+  const run = async () => {
+    for (const [ds, id] of targets) {
+      try {
+        await _loadStaticRecord(ds, id);
+      } catch (_) {}
+    }
+  };
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(() => { run(); }, { timeout: 2000 });
+  } else {
+    setTimeout(run, 900);
+  }
+}
+
+const PRESET_CASES = {
+  ptbxl_norm:       { dataset: "ptbxl",   fold: "10",             id: "9",      lead: 0, dxLabel: "Normal Sinus (PTB-XL #9)" },
+  ptbxl_afib:       { dataset: "ptbxl",   fold: "10",             id: "8215",   lead: 1, dxLabel: "Atrial Fibrillation (PTB-XL #8215)" },
+  georgia_nsr:      { dataset: "georgia", fold: "0_clean",        id: "E00021", lead: 1, dxLabel: "Normal Sinus (Georgia E00021)" },
+  georgia_af:       { dataset: "georgia", fold: "0_clean",        id: "E00005", lead: 1, dxLabel: "RBBB + AF (Georgia E00005)" },
+  georgia_lbbb:     { dataset: "georgia", fold: "0_clean",        id: "E10019", lead: 1, dxLabel: "LBBB (Georgia E10019)" },
+  georgia_iavb:     { dataset: "georgia", fold: "0_clean",        id: "E00067", lead: 1, dxLabel: "1st-Deg AVB (Georgia E00067)" },
+  georgia_artifact: { dataset: "georgia", fold: "3_severe_error", id: "E00006", lead: 1, dxLabel: "Signal Artifact (Georgia E00006)" },
+};
+
+function updatePresetHighlights(presetKey) {
+  state.activePreset = presetKey || "";
+  document.querySelectorAll("[data-preset]").forEach(btn => {
+    btn.classList.toggle("active", Boolean(presetKey && btn.dataset.preset === presetKey));
+  });
+}
+
+function updateActiveCaseSummary(text) {
+  const el = document.getElementById("active-case-summary");
+  if (el && text) el.textContent = text;
+}
+
+async function applyPresetCase(presetKey, scrollTargetId = null) {
+  const p = PRESET_CASES[presetKey];
+  if (!p) return;
+  const hasDs = (state.datasets || []).some(d => d.id === p.dataset);
+  if (!hasDs) return;
+
+  const chipBtn = document.querySelector(`[data-preset="${presetKey}"]`);
+  if (chipBtn) {
+    chipBtn.classList.add("loading");
+    chipBtn.disabled = true;
+  }
+  try {
+    updatePresetHighlights(presetKey);
+    state.dataset = p.dataset;
+    const dsSel = document.getElementById("dataset-select");
+    if (dsSel) dsSel.value = p.dataset;
+
+    applyDatasetControls(false);
+
+    const foldSel = document.getElementById("fold-select");
+    if (foldSel && [...foldSel.options].some(o => o.value === p.fold)) {
+      foldSel.value = p.fold;
+    }
+    const dxSel = document.getElementById("dx-select");
+    if (dxSel) dxSel.value = "ALL";
+    const leadSel = document.getElementById("lead-select");
+    if (leadSel) {
+      leadSel.value = String(p.lead);
+      state.leadIdx = p.lead;
+    }
+
+    await loadRecordList();
+    const recSel = document.getElementById("record-select");
+    if (recSel && ![...recSel.options].some(o => o.value === p.id)) {
+      const searchInp = document.getElementById("record-search");
+      if (searchInp) searchInp.value = p.id;
+      await loadRecordList();
+    }
+    if (recSel && [...recSel.options].some(o => o.value === p.id)) {
+      recSel.value = p.id;
+    }
+    await loadCurrentRecord();
+
+    if (scrollTargetId) {
+      const target = document.getElementById(scrollTargetId.replace(/^#/, ""));
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  } finally {
+    if (chipBtn) {
+      chipBtn.classList.remove("loading");
+      chipBtn.disabled = false;
+    }
+  }
+}
+
+function setupPresetButtons() {
+  const hasGeorgia = (state.datasets || []).some(d => d.id === "georgia");
+  document.querySelectorAll("[data-preset]").forEach(btn => {
+    const p = PRESET_CASES[btn.dataset.preset];
+    if (p && p.dataset === "georgia" && !hasGeorgia) {
+      btn.disabled = true;
+      btn.title = "Georgia 12-Lead dataset not available on this backend";
+    }
+    btn.addEventListener("click", () => {
+      applyPresetCase(btn.dataset.preset, btn.dataset.scrollTarget || null);
+    });
+  });
+}
+
+function setupStoryScrollSpy() {
+  const navLinks = Array.from(document.querySelectorAll(".primary-nav a[data-act]"));
+  if (!navLinks.length || typeof IntersectionObserver === "undefined") return;
+  const visible = new Set();
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (en.isIntersecting) visible.add(en.target.id);
+      else visible.delete(en.target.id);
+    });
+    const first = navLinks.find(a => visible.has(a.dataset.act));
+    if (first) {
+      navLinks.forEach(a => a.classList.toggle("active", a === first));
+    }
+  }, { rootMargin: "-18% 0px -65% 0px", threshold: 0.01 });
+
+  navLinks.forEach(a => {
+    const sec = document.getElementById(a.dataset.act);
+    if (sec) obs.observe(sec);
+  });
+}
+
+function renderExternalComparisonTable() {
+  const el = document.getElementById("external-comparison-table");
+  const ext = state.externalBenchmark;
+  if (!el) return;
+  if (!ext?.suite1_full_clean_cohort?.models || !ext?.suite2_neurokit2_delineation?.models) {
+    el.innerHTML = `<div class="hint">External Georgia benchmark summary not present on server.</div>`;
+    return;
+  }
+  const s1 = ext.suite1_full_clean_cohort.models;
+  const s2 = ext.suite2_neurokit2_delineation.models;
+  const s3 = ext.suite3_uncertainty_and_noise?.models || {};
+  const order = [
+    "dense_cem_s42",
+    "dense_cbm_detached_s42",
+    "dense_cbm_joint_s42",
+    "dense_multitask_s42",
+    "dense_blackbox_s42",
+  ].filter(k => s1[k]);
+
+  let html = `<table class="metrics-table"><thead><tr>
+    <th>Model (PTB-XL Seed 42, Zero-Shot)</th>
+    <th>NK2 QRS / P / T F1 (Georgia)</th>
+    <th>PTB-XL Fold-10 Ceiling</th>
+    <th>HR MAE</th>
+    <th>Canon. Cycle</th>
+    <th>Bnd / Int σ</th>
+    <th>4-Class Path AUROC</th>
+  </tr></thead><tbody>`;
+
+  order.forEach(k => {
+    const m1 = s1[k];
+    const g2 = s2[k]?.georgia;
+    const p2 = s2[k]?.ptbxl_fold10;
+    const u3 = s3[k];
+    const nkG = g2 ? `${g2.QRS.tol_150ms.f1.toFixed(3)} / ${g2.P.tol_150ms.f1.toFixed(3)} / ${g2.T.tol_150ms.f1.toFixed(3)}` : "—";
+    const nkP = p2 ? `${p2.QRS.tol_150ms.f1.toFixed(3)} / ${p2.P.tol_150ms.f1.toFixed(3)} / ${p2.T.tol_150ms.f1.toFixed(3)}` : "—";
+    const hr = m1.segmentation ? `${m1.segmentation.hr_agreement.mae_bpm.toFixed(2)} bpm` : "—";
+    const cy = m1.segmentation ? `${(m1.segmentation.canonical_transition_rate * 100).toFixed(2)}%` : "—";
+    const bi = u3 ? `${u3.georgia_clean_bnd_vs_int.toFixed(2)}×` : "—";
+    const pa = m1.pathology.macro_auroc_4_ex_mi.toFixed(4);
+    html += `<tr>
+      <td><strong>${m1.display_name}</strong></td>
+      <td>${nkG}</td>
+      <td>${nkP}</td>
+      <td>${hr}</td>
+      <td>${cy}</td>
+      <td>${bi}</td>
+      <td class="${k === "dense_cem_s42" ? "best" : ""}">${pa}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  el.innerHTML = html;
 }
 
 const CONDITION_LABELS = {
@@ -576,6 +927,10 @@ function applyDatasetControls(switchLead = true) {
     }
   }
 
+  state.denseBenchDataset = state.dataset;
+  document.querySelectorAll("#dense-bench-toggle .tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.benchDs === state.denseBenchDataset);
+  });
   renderDenseMetricsTable();
   renderMetricsTable();
 }
@@ -609,8 +964,15 @@ async function loadRecordList() {
   if (dxVal && dxVal !== "ALL") params.set("dx", dxVal);
   if (search) params.set("search", search);
 
-  const data = await apiGet(`/records?${params.toString()}`);
-  const sel  = document.getElementById("record-select");
+  const sel = document.getElementById("record-select");
+  sel.disabled = true;
+  sel.innerHTML = `<option value="">Loading records…</option>`;
+  let data;
+  try {
+    data = await apiGet(`/records?${params.toString()}`);
+  } finally {
+    sel.disabled = false;
+  }
   sel.innerHTML = "";
   (data.records || []).forEach(r => {
     let text;
@@ -648,52 +1010,79 @@ async function loadCurrentRecord() {
   updateResetIntButton();
   updateDenseIntButtons();
 
-  document.getElementById("signal-hint").style.display = "none";
+  const loadBtn = document.getElementById("load-btn");
+  if (loadBtn) {
+    loadBtn.disabled = true;
+    loadBtn.textContent = "Loading…";
+  }
+  const sigHint = document.getElementById("signal-hint");
+  if (!state.signal && sigHint) {
+    sigHint.innerHTML = `<span class="spinner" aria-hidden="true"></span> Loading ECG ${ecgId}…`;
+    sigHint.style.display = "";
+  }
+  setSectionLoading("signal-section", true);
+  setSectionLoading("act-segment", true);
+  setSectionLoading("dense-seg-section", true);
   document.getElementById("pipeline-section").style.display = "";
+  const segSec = document.getElementById("act-segment");
+  if (segSec) segSec.style.display = "";
 
-  let data;
   try {
-    data = await apiGet(
-      `/record/${encodeURIComponent(ecgId)}?model_id=${encodeURIComponent(state.primaryModel || "")}&dataset=${encodeURIComponent(state.dataset)}`
-    );
-  } catch (err) {
-    alert(`Failed to load record: ${err.message}`);
-    return;
-  }
-  state.signal       = data.signal;
-  state.delineation  = data.delineation;
-  state.softSeg      = data.soft_seg || null;
-  state.nSamples     = data.n_samples;
-  state.nSamplesDs   = data.n_samples_ds;
-  state.downsample   = data.downsample;
-  state.tFixed       = data.t_fixed;
-  state.samplingRate = data.sampling_rate || 500;
+    let data;
+    try {
+      data = await apiGet(
+        `/record/${encodeURIComponent(ecgId)}?model_id=${encodeURIComponent(state.primaryModel || "")}&dataset=${encodeURIComponent(state.dataset)}`
+      );
+    } catch (err) {
+      alert(`Failed to load record: ${err.message}`);
+      return;
+    }
+    if (sigHint) sigHint.style.display = "none";
+    state.signal       = data.signal;
+    state.delineation  = data.delineation;
+    state.softSeg      = data.soft_seg || null;
+    state.nSamples     = data.n_samples;
+    state.nSamplesDs   = data.n_samples_ds;
+    state.downsample   = data.downsample;
+    state.tFixed       = data.t_fixed;
+    state.samplingRate = data.sampling_rate || 500;
 
-  // Position initial window on the 3rd R-peak if delineated, else midpoint
-  const rps = data.delineation?.r_peaks || [];
-  if (rps.length >= 3) {
-    state.windowStart = Math.max(0, Math.min(state.nSamples - state.tFixed, rps[2] - Math.floor(state.tFixed / 2)));
-  } else {
-    state.windowStart = Math.max(0, Math.floor(state.nSamples / 2) - Math.floor(state.tFixed / 2));
-  }
+    // Position initial window on the 3rd R-peak if delineated, else midpoint
+    const rps = data.delineation?.r_peaks || [];
+    if (rps.length >= 3) {
+      state.windowStart = Math.max(0, Math.min(state.nSamples - state.tFixed, rps[2] - Math.floor(state.tFixed / 2)));
+    } else {
+      state.windowStart = Math.max(0, Math.floor(state.nSamples / 2) - Math.floor(state.tFixed / 2));
+    }
 
-  const age = data.age > 0 ? `age ${Math.round(data.age)}` : "";
-  if (data.dataset === "georgia") {
-    const sexTag = data.sex_label || "";
-    const dxArr = (data.label_names && data.label_names.length) ? data.label_names : (data.dx || []);
-    const dxStr = dxArr.length ? `· ${dxArr.join(", ")}` : "";
-    const hrStr = data.est_hr_bpm ? ` · ${data.est_hr_bpm} bpm` : "";
-    document.getElementById("record-meta").textContent =
-      `— Georgia ${ecgId} (${data.severity_tier})  ${age} ${sexTag} ${dxStr}${hrStr}  (${rps.length} R-peaks)`;
-  } else {
-    const sex = data.sex === 0 ? "M" : "F";
-    const dx  = data.dx && data.dx.length ? `· ${data.dx.join(", ")}` : "";
-    document.getElementById("record-meta").textContent =
-      `— Record #${ecgId}  ${age} ${sex} ${dx}  (${rps.length} R-peaks)`;
-  }
+    const age = data.age > 0 ? `age ${Math.round(data.age)}` : "";
+    const leadName = document.getElementById("lead-select")?.selectedOptions?.[0]?.textContent || "I";
+    if (data.dataset === "georgia") {
+      const sexTag = data.sex_label || "";
+      const dxArr = (data.label_names && data.label_names.length) ? data.label_names : (data.dx || []);
+      const dxStr = dxArr.length ? `· ${dxArr.join(", ")}` : "";
+      const hrStr = data.est_hr_bpm ? ` · ${data.est_hr_bpm} bpm` : "";
+      document.getElementById("record-meta").textContent =
+        `— Georgia ${ecgId} (${data.severity_tier})  ${age} ${sexTag} ${dxStr}${hrStr}  (${rps.length} R-peaks)`;
+      updateActiveCaseSummary(`Georgia ${ecgId} (${data.severity_tier})${dxStr} · Lead ${leadName}`);
+    } else {
+      const sex = data.sex === 0 ? "M" : "F";
+      const dx  = data.dx && data.dx.length ? `· ${data.dx.join(", ")}` : "";
+      document.getElementById("record-meta").textContent =
+        `— Record #${ecgId}  ${age} ${sex} ${dx}  (${rps.length} R-peaks)`;
+      updateActiveCaseSummary(`PTB-XL #${ecgId} ${dx} · Lead ${leadName}`);
+    }
 
-  renderSignal();
-  await Promise.all([runSweep(), runDenseInfer()]);
+    renderSignal();
+    renderSegmentedSignal();
+    await Promise.all([runSweep(), runDenseInfer()]);
+  } finally {
+    if (loadBtn) {
+      loadBtn.disabled = false;
+      loadBtn.textContent = "Load";
+    }
+    setSectionLoading("signal-section", false);
+  }
 }
 
 // ── Signal Waveform Chart ──────────────────────────────────────────────────
@@ -733,56 +1122,6 @@ function renderSignal() {
   signalG.append("g").attr("class", "axis")
     .call(d3.axisLeft(yScale).ticks(5));
 
-  // Optional per-timestamp segmentation shading directly behind the ECG waveform
-  const segPalette = { P: "#2b5b84", PQ: "#2a7f8e", QRS: "#b83b2a", ST: "#9e4268", T: "#2d7a56" };
-  const hasSegProbs = obj => Boolean(obj && obj.has_seg !== false && obj.concept_probs);
-  let segSrc = null, segSr = 100;
-  if (state.ecgSegOverlay === "dense_cem" && state.denseData) {
-    const src = (hasSegProbs(state.denseData) && state.denseData.model_type === "dense_cem")
-      ? state.denseData
-      : (hasSegProbs(state.denseData.compare) && state.denseData.compare.model_type === "dense_cem" ? state.denseData.compare : null);
-    segSrc = src?.concept_probs || null;
-    segSr = state.denseData.sampling_rate || 100;
-  } else if (state.ecgSegOverlay === "dense_cbm" && state.denseData) {
-    const src = (hasSegProbs(state.denseData) && state.denseData.model_type === "dense_cbm")
-      ? state.denseData
-      : (hasSegProbs(state.denseData.compare) && state.denseData.compare.model_type === "dense_cbm" ? state.denseData.compare : null);
-    segSrc = src?.concept_probs || null;
-    segSr = state.denseData.sampling_rate || 100;
-  } else if (state.ecgSegOverlay === "zenodo") {
-    segSrc = state.denseData?.gt_probs || state.softSeg;
-    segSr = state.softSeg?.sampling_rate || 100;
-  }
-  if (segSrc) {
-    const keys = ["P", "PQ", "QRS", "ST", "T"].filter(k => Array.isArray(segSrc[k]) && segSrc[k].length);
-    const nSeg = keys.length ? segSrc[keys[0]].length : 0;
-    const scaleSeg = sr / segSr;
-    // Merge contiguous spans of the winning wave class (>0.35) into crisp background bands
-    let curKey = null, runStart = 0;
-    const flushRun = endIdx => {
-      if (!curKey || endIdx <= runStart) return;
-      const x0 = _xScaleSig(runStart * scaleSeg);
-      const x1 = _xScaleSig(endIdx * scaleSeg);
-      signalG.append("rect")
-        .attr("x", x0).attr("y", 0)
-        .attr("width", Math.max(1, x1 - x0)).attr("height", H)
-        .attr("fill", segPalette[curKey]).attr("opacity", 0.14);
-    };
-    for (let i = 0; i < nSeg; i++) {
-      let bestK = null, bestV = 0.35;
-      keys.forEach(k => {
-        const v = segSrc[k][i];
-        if (v > bestV) { bestV = v; bestK = k; }
-      });
-      if (bestK !== curKey) {
-        flushRun(i);
-        curKey = bestK;
-        runStart = i;
-      }
-    }
-    flushRun(nSeg);
-  }
-
   // Delineated R-peaks (dashed vertical lines)
   const delin = state.delineation || {};
   (delin.r_peaks || []).forEach(r => {
@@ -814,7 +1153,7 @@ function renderSignal() {
   drawPeakDots(delin.p_peaks, "#2b5b84");
   drawPeakDots(delin.t_peaks, "#2d7a56");
 
-  // Draggable 1.0s Window
+  // Draggable 1.0s Window & Midpoint Cursor
   const startFromX = px => Math.max(0, Math.min(T - tFixed, Math.round(_xScaleSig.invert(px))));
 
   windowRect = signalG.append("rect")
@@ -823,6 +1162,10 @@ function renderSignal() {
     .attr("class", "window-handle").attr("width", 7).attr("height", 20).attr("y", H / 2 - 10);
   windowHandleR = signalG.append("rect")
     .attr("class", "window-handle").attr("width", 7).attr("height", 20).attr("y", H / 2 - 10);
+
+  window._sigMidCursorScale = _xScaleSig;
+  window._sigMidCursor = signalG.append("line")
+    .attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
 
   updateWindowPosition(state.windowStart);
 
@@ -852,11 +1195,139 @@ function renderSignal() {
   });
 }
 
+// ── Act 03 Waveform Chart with Soft-Segmentation Background Shading ─────────
+function renderSegmentedSignal() {
+  const container = document.getElementById("seg-signal-container");
+  if (!container) return;
+  container.innerHTML = "";
+  if (!state.signal) return;
+
+  const W = chartWidth();
+  const H = 128;
+  const { left: ml, right: mr, top: mt, bottom: mb } = SIG_MARGIN;
+
+  const svg = d3.select(container).append("svg")
+    .attr("width", W + ml + mr)
+    .attr("height", H + mt + mb);
+  const g = svg.append("g").attr("transform", `translate(${ml},${mt})`);
+
+  const raw    = state.signal[state.leadIdx];
+  const ds     = state.downsample;
+  const T      = state.nSamples;
+  const sr     = state.samplingRate;
+  const tFixed = state.tFixed;
+
+  const xScale = d3.scaleLinear().domain([0, T]).range([0, W]);
+  const winWpx = xScale(tFixed) - xScale(0);
+
+  const yMin = d3.min(raw), yMax = d3.max(raw);
+  const yPad = (yMax - yMin) * 0.12 || 0.2;
+  const yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([H, 0]);
+
+  g.append("g").attr("class", "grid")
+    .call(d3.axisLeft(yScale).tickSize(-W).tickFormat("").ticks(4));
+  g.append("g").attr("class", "axis")
+    .attr("transform", `translate(0,${H})`)
+    .call(d3.axisBottom(xScale).ticks(10).tickFormat(d => `${(d / sr).toFixed(1)}s`));
+  g.append("g").attr("class", "axis")
+    .call(d3.axisLeft(yScale).ticks(4));
+
+  // Background wave-segmentation shading aligned with 100 Hz soft-seg curves below
+  const segPalette = { P: "#2b5b84", PQ: "#2a7f8e", QRS: "#b83b2a", ST: "#9e4268", T: "#2d7a56" };
+  const spanCols   = ["#2b5b84", "#2a7f8e", "#b83b2a", "#9e4268", "#2d7a56"];
+  const hasSegProbs = obj => Boolean(obj && obj.has_seg !== false && obj.concept_probs);
+  let segSrc = null, segSpans = null, segSr = 100;
+  if (state.ecgSegOverlay === "dense_cem" && state.denseData) {
+    const src = (hasSegProbs(state.denseData) && state.denseData.model_type === "dense_cem")
+      ? state.denseData
+      : (hasSegProbs(state.denseData.compare) && state.denseData.compare.model_type === "dense_cem" ? state.denseData.compare : null);
+    segSrc   = src?.concept_probs || null;
+    segSpans = !state.denseIntMode ? (src?.seg_spans || null) : null;
+    segSr    = state.denseData.sampling_rate || 100;
+  } else if (state.ecgSegOverlay === "dense_cbm" && state.denseData) {
+    const src = (hasSegProbs(state.denseData) && state.denseData.model_type === "dense_cbm")
+      ? state.denseData
+      : (hasSegProbs(state.denseData.compare) && state.denseData.compare.model_type === "dense_cbm" ? state.denseData.compare : null);
+    segSrc   = src?.concept_probs || null;
+    segSpans = !state.denseIntMode ? (src?.seg_spans || null) : null;
+    segSr    = state.denseData.sampling_rate || 100;
+  } else if (state.ecgSegOverlay === "zenodo") {
+    segSrc   = state.denseData?.gt_probs || state.softSeg;
+    segSpans = !state.denseIntMode ? (state.denseData?.gt_spans || null) : null;
+    segSr    = state.softSeg?.sampling_rate || 100;
+  }
+  const scaleSeg = sr / segSr;
+  if (Array.isArray(segSpans) && segSpans.length) {
+    for (let idx = 0; idx < segSpans.length; idx++) {
+      const [s0, s1, wIdx] = segSpans[idx];
+      const x0 = xScale(s0 * scaleSeg);
+      const x1 = xScale(s1 * scaleSeg);
+      g.append("rect")
+        .attr("x", x0).attr("y", 0)
+        .attr("width", Math.max(1, x1 - x0)).attr("height", H)
+        .attr("fill", spanCols[wIdx]).attr("opacity", 0.16);
+    }
+  } else if (segSrc) {
+    const keys = ["P", "PQ", "QRS", "ST", "T"].filter(k => Array.isArray(segSrc[k]) && segSrc[k].length);
+    const nSeg = keys.length ? segSrc[keys[0]].length : 0;
+    let curKey = null, runStart = 0;
+    const flushRun = endIdx => {
+      if (!curKey || endIdx <= runStart) return;
+      const x0 = xScale(runStart * scaleSeg);
+      const x1 = xScale(endIdx * scaleSeg);
+      g.append("rect")
+        .attr("x", x0).attr("y", 0)
+        .attr("width", Math.max(1, x1 - x0)).attr("height", H)
+        .attr("fill", segPalette[curKey]).attr("opacity", 0.16);
+    };
+    for (let i = 0; i < nSeg; i++) {
+      let bestK = null, bestV = 0.35;
+      keys.forEach(k => {
+        const v = segSrc[k][i];
+        if (v > bestV) { bestV = v; bestK = k; }
+      });
+      if (bestK !== curKey) {
+        flushRun(i);
+        curKey = bestK;
+        runStart = i;
+      }
+    }
+    flushRun(nSeg);
+  }
+
+  // Non-interactive 1.0s selected window span + ECG trace + midpoint cursor
+  window._segSignalWinRect = g.append("rect")
+    .attr("y", 0).attr("height", H).attr("width", winWpx)
+    .attr("fill", "rgba(184, 59, 42, 0.08)")
+    .style("pointer-events", "none");
+
+  const lineGen = d3.line()
+    .x((_, i) => xScale(i * ds))
+    .y(d => yScale(d));
+  g.append("path").datum(raw).attr("class", "ecg-line").attr("d", lineGen);
+
+  window._segSignalCursorScale = xScale;
+  window._segSignalCursor = g.append("line")
+    .attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
+  updateSyncCursors(state.windowStart);
+
+  const halfWin = tFixed / 2;
+  svg.style("cursor", "pointer").on("click", async e => {
+    const [mx] = d3.pointer(e, g.node());
+    if (mx < 0 || mx > W) return;
+    const start = Math.max(0, Math.min(T - tFixed, Math.round(xScale.invert(mx) - halfWin)));
+    updateWindowPosition(start);
+    await updatePipeline();
+  });
+}
+
 // ── Sliding-Window Sweep ───────────────────────────────────────────────────
 async function runSweep() {
   if (state.ecgId === null) return;
-  const stride = parseInt(document.getElementById("stride-input").value, 10) || 20;
-  const status = document.getElementById("sweep-status");
+  const stride   = parseInt(document.getElementById("stride-input").value, 10) || 20;
+  const status   = document.getElementById("sweep-status");
+  const sweepBtn = document.getElementById("sweep-btn");
+  if (sweepBtn) sweepBtn.disabled = true;
   status.textContent = "Computing batched sweep…";
   status.className   = "status-label running";
 
@@ -872,6 +1343,8 @@ async function runSweep() {
     status.textContent = `Sweep error: ${e.message}`;
     status.className   = "status-label";
     return;
+  } finally {
+    if (sweepBtn) sweepBtn.disabled = false;
   }
 
   const cmpTag = state.sweepData.compare ? ` + ${state.sweepData.compare.model_id}` : "";
@@ -885,33 +1358,17 @@ async function runSweep() {
 }
 
 function renderTimelineView() {
-  if (!state.sweepData && !state.denseData) return;
-  const lp  = document.getElementById("lineplot-container");
-  const hm  = document.getElementById("heatmap-container");
-  const scb = document.getElementById("seg-controls-bar");
-  const unc = document.getElementById("unc-strip-container");
-
+  if (!state.sweepData) return;
+  const lp = document.getElementById("lineplot-container");
+  const hm = document.getElementById("heatmap-container");
   if (state.timelineView === "heatmap") {
-    scb.style.display = "none";
-    unc.style.display = "none";
-    lp.style.display  = "none";
-    hm.style.display  = "";
-    if (state.sweepData) renderHeatmap(state.sweepData);
-  } else if (state.timelineView === "dense" || state.timelineView === "softseg") {
-    hm.style.display  = "none";
-    scb.style.display = "";
-    lp.style.display  = "";
-    const modeSel = document.getElementById("seg-compare-mode");
-    if (state.timelineView === "dense" && modeSel.value === "gt_only") {
-      modeSel.value = "cem_vs_cbm";
-    }
-    renderUnifiedSegmentationView();
+    lp.style.display = "none";
+    hm.style.display = "";
+    renderHeatmap(state.sweepData);
   } else {
-    scb.style.display = "none";
-    unc.style.display = "none";
-    hm.style.display  = "none";
-    lp.style.display  = "";
-    if (state.sweepData) renderActivationLineplot(state.sweepData);
+    hm.style.display = "none";
+    lp.style.display = "";
+    renderActivationLineplot(state.sweepData);
   }
 }
 
@@ -975,9 +1432,16 @@ async function runDenseInfer() {
     intervene_concepts: state.denseIntConcept ? [state.denseIntConcept] : null,
     intervene_span:    span,
   };
+  const st = document.getElementById("dense-seg-status");
+  const loadLabel = wantEp
+    ? "Running MC-Dropout…"
+    : (state.denseIntMode ? "Applying intervention…" : "Running dense U-Net…");
+  if (st) st.textContent = "— Computing dense segmentation…";
+  setLoadingPill("dense-loading-indicator", true, loadLabel);
+  setSectionLoading("act-segment", true);
+  setSectionLoading("dense-seg-section", true);
   try {
     state.denseData = await apiPost("/dense-infer", body);
-    const st = document.getElementById("dense-seg-status");
     const intTag = state.denseIntMode
       ? ` · Intervention: ${state.denseIntMode.toUpperCase()}${state.denseIntConcept ? " " + state.denseIntConcept : ""} (${scope})`
       : "";
@@ -991,17 +1455,37 @@ async function runDenseInfer() {
     if (iv?.qt_ms  !== null && iv?.qt_ms  !== undefined) ivParts.push(`QT ${iv.qt_ms}ms`);
     if (iv?.pred_hr_bpm !== null && iv?.pred_hr_bpm !== undefined) ivParts.push(`HR ${iv.pred_hr_bpm}bpm`);
     const ivTag = ivParts.length ? ` · ${ivParts.join(" · ")}` : "";
-    st.textContent = `— ${ids.join(" vs. ")}${ivTag}${intTag}`;
+    if (st) st.textContent = `— ${ids.join(" vs. ")}${ivTag}${intTag}`;
 
+    renderDenseIntervalBadges(iv);
     renderDensePathologyBars();
     renderDenseWavePills();
-    if (state.ecgSegOverlay !== "none") renderSignal();
-    if (state.timelineView === "dense" || state.timelineView === "softseg") {
-      renderUnifiedSegmentationView();
-    }
+    renderUnifiedSegmentationView();
+    renderSegmentedSignal();
   } catch (e) {
     console.warn("Dense infer failed:", e);
+    if (st) st.textContent = "— Dense inference failed";
+  } finally {
+    setLoadingPill("dense-loading-indicator", false);
+    setSectionLoading("act-segment", false);
+    setSectionLoading("dense-seg-section", false);
   }
+}
+
+function renderDenseIntervalBadges(iv) {
+  const el = document.getElementById("dense-interval-badges");
+  if (!el) return;
+  if (!iv) {
+    el.innerHTML = "";
+    return;
+  }
+  const badges = [];
+  if (iv.qrs_ms !== null && iv.qrs_ms !== undefined) badges.push(`QRS ${iv.qrs_ms} ms`);
+  if (iv.pr_ms  !== null && iv.pr_ms  !== undefined) badges.push(`PR ${iv.pr_ms} ms`);
+  if (iv.qt_ms  !== null && iv.qt_ms  !== undefined) badges.push(`QT ${iv.qt_ms} ms`);
+  if (iv.pred_hr_bpm !== null && iv.pred_hr_bpm !== undefined) badges.push(`HR ${iv.pred_hr_bpm} bpm`);
+  if (iv.canon_cycle !== null && iv.canon_cycle !== undefined) badges.push(`Cycle ${(iv.canon_cycle * 100).toFixed(1)}%`);
+  el.innerHTML = badges.map(b => `<span class="iv-badge">${b}</span>`).join("");
 }
 
 function updateDenseIntButtons() {
@@ -1155,7 +1639,8 @@ function renderDenseMetricsTable() {
 
   // External Zero-Shot Georgia 12-Lead Benchmark view
   const ext = state.externalBenchmark;
-  if (state.dataset === "georgia" && ext?.suite1_full_clean_cohort?.models) {
+  const benchDs = state.denseBenchDataset || state.dataset;
+  if (benchDs === "georgia" && ext?.suite1_full_clean_cohort?.models) {
     if (titleEl) titleEl.textContent = "Zero-Shot External Benchmark · Georgia 12-Lead (8,770 Clean ECGs)";
     const s1 = ext.suite1_full_clean_cohort.models;
     const s2 = ext.suite2_neurokit2_delineation?.models || {};
@@ -1274,8 +1759,10 @@ function renderDenseMetricsTable() {
 }
 
 function renderUnifiedSegmentationView() {
-  const container = document.getElementById("lineplot-container");
+  const container = document.getElementById("dense-seg-canvas");
   const uncBox    = document.getElementById("unc-strip-container");
+  const legBox    = document.getElementById("dense-seg-legend");
+  if (!container || !uncBox) return;
   container.innerHTML = "";
   uncBox.innerHTML    = "";
 
@@ -1378,8 +1865,8 @@ function renderUnifiedSegmentationView() {
   });
 
   const cursor = g.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
-  window._lineCursorScale = xScale;
-  window._lineCursor      = cursor;
+  window._denseCursorScale = xScale;
+  window._denseCursor      = cursor;
   updateSyncCursors(state.windowStart);
 
   // Interactive hover readout + click/drag to move ECG window
@@ -1408,9 +1895,11 @@ function renderUnifiedSegmentationView() {
   });
 
   const backDesc = backProbs ? (backIsDashed ? ` · Dashed: ${backLabel}` : ` · Shaded: ${backLabel}`) : "";
-  document.getElementById("timeline-legend").innerHTML =
-    groups.map(gr => `<span class="leg-item"><i class="swatch" style="background:${gr.col}"></i>${gr.key}</span>`).join("") +
-    `<span class="meta-label">Solid: ${solidLabel}${backDesc}</span>`;
+  if (legBox) {
+    legBox.innerHTML =
+      groups.map(gr => `<span class="leg-item"><i class="swatch" style="background:${gr.col}"></i>${gr.key}</span>`).join("") +
+      `<span class="meta-label">Solid: ${solidLabel}${backDesc}</span>`;
+  }
 
   // Optional synchronized per-timestamp boundary uncertainty strip σ(t)
   if (showUnc && (cemObj?.mean_std_timeline || cbmObj?.mean_std_timeline)) {
@@ -1555,7 +2044,16 @@ function renderActivationLineplot(data) {
     styleNote;
 }
 
-// ── Sweep Heatmap ──────────────────────────────────────────────────────────
+// ── Sweep Heatmap (HiDPI Canvas + lightweight SVG axis/cursor overlay) ──────
+let _HEATMAP_LUT = null;
+function _getHeatmapLUT() {
+  if (_HEATMAP_LUT) return _HEATMAP_LUT;
+  const color = d3.scaleSequential(d3.interpolateYlOrRd).domain([0, 255]);
+  _HEATMAP_LUT = new Array(256);
+  for (let i = 0; i < 256; i++) _HEATMAP_LUT[i] = color(i);
+  return _HEATMAP_LUT;
+}
+
 function renderHeatmap(data) {
   const container = document.getElementById("heatmap-container");
   container.innerHTML = "";
@@ -1571,26 +2069,49 @@ function renderHeatmap(data) {
   const CELL_W  = W / N;
   const MAP_TOP = 8;
   const MAP_BOT = 28;
+  const MAP_H   = CELL_H * K;
   const sr      = data.sampling_rate || state.samplingRate;
-  const color   = d3.scaleSequential(d3.interpolateYlOrRd).domain([0, 1]);
+  const lut     = _getHeatmapLUT();
 
-  const svg = d3.select(container).append("svg")
+  const wrap = document.createElement("div");
+  wrap.style.position = "relative";
+  wrap.style.width = `${W + ml + mr}px`;
+  wrap.style.height = `${MAP_TOP + MAP_H + MAP_BOT}px`;
+  container.appendChild(wrap);
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(W * dpr));
+  canvas.height = Math.max(1, Math.round(MAP_H * dpr));
+  canvas.style.position = "absolute";
+  canvas.style.left = `${ml}px`;
+  canvas.style.top = `${MAP_TOP}px`;
+  canvas.style.width = `${W}px`;
+  canvas.style.height = `${MAP_H}px`;
+  canvas.style.pointerEvents = "none";
+  wrap.appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const drawW = Math.ceil(CELL_W) + 0.5;
+  const drawH = CELL_H - 1;
+  for (let ki = 0; ki < K; ki++) {
+    const y = ki * CELL_H;
+    for (let ni = 0; ni < N; ni++) {
+      const idx = Math.max(0, Math.min(255, Math.round((cProbs[ni][ki] || 0) * 255)));
+      ctx.fillStyle = lut[idx];
+      ctx.fillRect(ni * CELL_W, y, drawW, drawH);
+    }
+  }
+
+  const svg = d3.select(wrap).append("svg")
     .attr("width", W + ml + mr)
-    .attr("height", MAP_TOP + CELL_H * K + MAP_BOT);
+    .attr("height", MAP_TOP + MAP_H + MAP_BOT)
+    .style("position", "relative")
+    .style("z-index", "1");
   const g = svg.append("g").attr("transform", `translate(${ml},${MAP_TOP})`);
 
   names.forEach((name, ki) => {
-    starts.forEach((start, ni) => {
-      g.append("rect")
-        .attr("x", ni * CELL_W).attr("y", ki * CELL_H)
-        .attr("width", Math.ceil(CELL_W) + 0.5).attr("height", CELL_H - 1)
-        .attr("fill", color(cProbs[ni][ki]))
-        .style("cursor", "pointer")
-        .on("click", async () => {
-          updateWindowPosition(start);
-          await updatePipeline();
-        });
-    });
     svg.append("text")
       .attr("x", ml - 6).attr("y", MAP_TOP + ki * CELL_H + CELL_H / 2 + 4)
       .attr("text-anchor", "end").attr("fill", "#767676").attr("font-size", 10)
@@ -1599,10 +2120,21 @@ function renderHeatmap(data) {
 
   const xScale = d3.scaleLinear().domain([0, state.nSamples]).range([0, W]);
   g.append("g").attr("class", "axis")
-    .attr("transform", `translate(0,${CELL_H * K})`)
+    .attr("transform", `translate(0,${MAP_H})`)
     .call(d3.axisBottom(xScale).ticks(10).tickFormat(d => `${(d / sr).toFixed(1)}s`));
 
-  const cursor = g.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", CELL_H * K);
+  g.append("rect")
+    .attr("x", 0).attr("y", 0).attr("width", W).attr("height", MAP_H)
+    .attr("fill", "transparent")
+    .style("cursor", "pointer")
+    .on("click", async e => {
+      const [mx] = d3.pointer(e, g.node());
+      const ni = Math.max(0, Math.min(N - 1, Math.floor(mx / CELL_W)));
+      updateWindowPosition(starts[ni]);
+      await updatePipeline();
+    });
+
+  const cursor = g.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", MAP_H);
   window._heatmapCursorScale = xScale;
   window._heatmapCursor      = cursor;
   updateSyncCursors(state.windowStart);
@@ -1652,13 +2184,18 @@ async function updatePipeline() {
   if (state.ecgId === null) return;
   renderWindowPlot();
 
+  const scope = document.getElementById("dense-int-scope")?.value || "record";
+  const wantDenseWinSync = Boolean(state.denseIntMode && scope === "window");
   const hasInt = Object.keys(state.interventions).length > 0;
   const wantEpistemic = document.getElementById("epistemic-chk").checked;
   if (state.sweepData && !hasInt && !wantEpistemic) {
     updatePipelineFromSweep();
+    if (wantDenseWinSync) await runDenseInfer();
     return;
   }
 
+  setLoadingPill("pipeline-loading-indicator", true, wantEpistemic ? "Running MC-Dropout…" : "Updating…");
+  setSectionLoading("pipeline-section", true);
   try {
     const result = await apiPost("/infer", {
       ecg_id:            state.ecgId,
@@ -1671,8 +2208,12 @@ async function updatePipeline() {
     });
     if (result.concept_names) state.conceptNames = result.concept_names;
     renderPipelineValues(result);
+    if (wantDenseWinSync) await runDenseInfer();
   } catch (e) {
     console.error("Infer error:", e);
+  } finally {
+    setLoadingPill("pipeline-loading-indicator", false);
+    setSectionLoading("pipeline-section", false);
   }
 }
 
@@ -1776,6 +2317,12 @@ function renderWindowPlot() {
     .attr("d", d3.area().x((_, i) => xScale(i)).y0(iH).y1(d => yScale(d)));
   g.append("path").datum(slice).attr("fill", "none").attr("stroke", "#222222").attr("stroke-width", 1.35)
     .attr("d", d3.line().x((_, i) => xScale(i)).y(d => yScale(d)));
+
+  const midX = xScale((slice.length - 1) / 2);
+  g.append("line")
+    .attr("class", "sync-cursor")
+    .attr("x1", midX).attr("x2", midX)
+    .attr("y1", 0).attr("y2", iH);
 }
 
 // ── Concept Histogram (with ±1σ, GT dots, and optional Compare marker) ─────
@@ -2086,9 +2633,24 @@ function renderInterventionCurves() {
 // ── Shared Cursor Sync ─────────────────────────────────────────────────────
 function updateSyncCursors(windowStart) {
   const centre = windowStart + state.tFixed / 2;
+  if (window._sigMidCursor && window._sigMidCursorScale) {
+    const px = window._sigMidCursorScale(centre);
+    window._sigMidCursor.attr("x1", px).attr("x2", px);
+  }
   if (window._lineCursor && window._lineCursorScale) {
     const px = window._lineCursorScale(centre);
     window._lineCursor.attr("x1", px).attr("x2", px);
+  }
+  if (window._segSignalCursor && window._segSignalCursorScale) {
+    const px = window._segSignalCursorScale(centre);
+    window._segSignalCursor.attr("x1", px).attr("x2", px);
+    if (window._segSignalWinRect) {
+      window._segSignalWinRect.attr("x", window._segSignalCursorScale(windowStart));
+    }
+  }
+  if (window._denseCursor && window._denseCursorScale) {
+    const px = window._denseCursorScale(centre);
+    window._denseCursor.attr("x1", px).attr("x2", px);
   }
   if (window._heatmapCursor && window._heatmapCursorScale) {
     const px = window._heatmapCursorScale(centre);
@@ -2120,7 +2682,7 @@ document.getElementById("sweep-btn").addEventListener("click", runSweep);
 
 document.getElementById("lead-select").addEventListener("change", () => {
   state.leadIdx = parseInt(document.getElementById("lead-select").value, 10) || 0;
-  if (state.signal) { renderSignal(); renderWindowPlot(); }
+  if (state.signal) { renderSignal(); renderSegmentedSignal(); renderWindowPlot(); }
 });
 
 document.getElementById("dataset-select")?.addEventListener("change", async e => {
@@ -2147,19 +2709,24 @@ document.getElementById("epistemic-chk").addEventListener("change", () => {
 
 document.getElementById("ecg-seg-overlay").addEventListener("change", e => {
   state.ecgSegOverlay = e.target.value;
-  if (state.signal) renderSignal();
+  if (state.signal) renderSegmentedSignal();
 });
 
 document.getElementById("seg-compare-mode").addEventListener("change", () => {
-  if (state.timelineView === "dense" || state.timelineView === "softseg") {
-    renderUnifiedSegmentationView();
-  }
+  if (state.denseData || state.softSeg) renderUnifiedSegmentationView();
 });
 
 document.getElementById("seg-show-unc").addEventListener("change", () => {
-  if (state.timelineView === "dense" || state.timelineView === "softseg") {
-    renderUnifiedSegmentationView();
-  }
+  if (state.denseData || state.softSeg) renderUnifiedSegmentationView();
+});
+
+document.querySelectorAll("#dense-bench-toggle .tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#dense-bench-toggle .tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.denseBenchDataset = btn.dataset.benchDs || "ptbxl";
+    renderDenseMetricsTable();
+  });
 });
 
 document.getElementById("dense-int-scope").addEventListener("change", () => {
@@ -2203,8 +2770,9 @@ let _resizeTimer = null;
 new ResizeObserver(() => {
   clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(() => {
-    if (state.signal) renderSignal();
+    if (state.signal) { renderSignal(); renderSegmentedSignal(); }
     if (state.sweepData) renderTimelineView();
+    if (state.denseData || state.softSeg) renderUnifiedSegmentationView();
     if (state.primarySummary || state.compareSummary) renderInterventionCurves();
   }, 150);
 }).observe(document.getElementById("signal-section"));

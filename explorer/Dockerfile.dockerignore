@@ -13,7 +13,10 @@ checkpoints/
 runs/
 models/
 data/
-experiments/
+experiments/*
+!experiments/results
+experiments/results/*
+!experiments/results/external_georgia_eval.json
 tests/
 *.log
 .env

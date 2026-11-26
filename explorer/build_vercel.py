@@ -64,47 +64,129 @@ def _round_list(arr: np.ndarray, decimals: int) -> list:
     return np.round(np.asarray(arr, dtype=np.float64), decimals).tolist()
 
 
+def _quantize_u8_dict(arr: np.ndarray, names: List[str], omit_tp: bool = True) -> Dict[str, List[int]]:
+    """Quantize (K, T) float probabilities/stds into 0..255 ints, omitting redundant TP."""
+    out: Dict[str, List[int]] = {}
+    for i, name in enumerate(names):
+        if omit_tp and name == "TP":
+            continue
+        q = np.clip(np.round(np.asarray(arr[i], dtype=np.float64) * 255.0), 0, 255).astype(np.int32)
+        out[name] = q.tolist()
+    return out
+
+
+def _compute_seg_spans(probs_w6: np.ndarray, thresh: float = 0.35) -> List[List[int]]:
+    """Collapse (6, T) wave6 probabilities into contiguous [start, end, wave_idx] (wave_idx 0..4) spans."""
+    wave_probs = np.asarray(probs_w6[:5], dtype=np.float32)  # P, PQ, QRS, ST, T
+    T = wave_probs.shape[1]
+    best_vals = wave_probs.max(axis=0)
+    best_idx = wave_probs.argmax(axis=0)
+    active = best_vals > thresh
+
+    spans: List[List[int]] = []
+    cur_idx = -1
+    run_start = 0
+    for t in range(T):
+        w = int(best_idx[t]) if active[t] else -1
+        if w != cur_idx:
+            if cur_idx >= 0 and t > run_start:
+                spans.append([run_start, t, cur_idx])
+            cur_idx = w
+            run_start = t
+    if cur_idx >= 0 and T > run_start:
+        spans.append([run_start, T, cur_idx])
+    return spans
+
+
 def _select_curated_records() -> Tuple[List[int], List[str]]:
-    """Select 6 PTB-XL Fold-10 records and 6 Georgia 12-Lead (OOD) records."""
+    """Select 15 PTB-XL Fold-10 records and 15 Georgia 12-Lead (OOD) records across classes and tiers."""
     ptb_meta = exp_app._get_meta()
     fold10 = ptb_meta[ptb_meta["strat_fold"] == 10]
     archive = exp_app._get_soft_seg_archive()
 
-    ptb_picks: List[int] = [9]
-    for tag in ("AFIB", "BBB", "MI", "STTC", "HYP"):
-        cands = fold10[fold10["_tag_set"].apply(lambda s, t=tag: t in s)].index.tolist()
-        for eid in cands:
-            eid_i = int(eid)
-            if eid_i in ptb_picks:
-                continue
-            if archive is not None and eid_i not in archive:
-                continue
-            delin = exp_app._load_delineation_any(eid_i, 500, 0, dataset="ptbxl")
-            if delin.get("quality_ok", False):
-                ptb_picks.append(eid_i)
+    def _ptb_valid(eid_i: int) -> bool:
+        if eid_i not in fold10.index:
+            return False
+        if archive is not None and eid_i not in archive:
+            return False
+        return bool(exp_app._load_delineation_any(eid_i, 500, 0, dataset="ptbxl").get("quality_ok", False))
+
+    ptb_picks: List[int] = []
+    for eid_i in (9, 8215, 65, 63, 116, 162):
+        if eid_i not in ptb_picks and _ptb_valid(eid_i):
+            ptb_picks.append(eid_i)
+
+    ptb_tag_pools = {
+        tag: [int(e) for e in fold10[fold10["_tag_set"].apply(lambda s, t=tag: t in s)].index.tolist()]
+        for tag in ("NORM", "AFIB", "BBB", "MI", "STTC", "HYP")
+    }
+    ptb_cursor = {tag: 0 for tag in ptb_tag_pools}
+    ptb_tags = ("NORM", "AFIB", "BBB", "MI", "STTC", "HYP")
+    while len(ptb_picks) < 15:
+        progressed = False
+        for tag in ptb_tags:
+            if len(ptb_picks) >= 15:
                 break
-
-    ga_meta = exp_app._get_georgia_meta()
-    ga_clean = ga_meta[ga_meta["severity_tier"].astype(str) == "0_clean"]
-    ga_picks: List[str] = [rid for rid in ("E00021", "E00005", "E10019") if rid in ga_meta.index]
-
-    for tag in ("IAVB", "LQT"):
-        cands = ga_clean[ga_clean["_tag_set"].apply(lambda s, t=tag: t in s)].index.tolist()
-        for rid in cands:
-            if rid in ga_picks:
-                continue
-            delin = exp_app._load_delineation_any(rid, 500, 1, dataset="georgia")
-            if delin.get("quality_ok", False):
-                ga_picks.append(str(rid))
-                break
-
-    ga_sev = ga_meta[ga_meta["severity_tier"].astype(str) == "3_severe_error"]
-    for rid in ga_sev.index.tolist():
-        if str(rid) not in ga_picks:
-            ga_picks.append(str(rid))
+            pool = ptb_tag_pools[tag]
+            idx = ptb_cursor[tag]
+            while idx < len(pool):
+                eid_i = pool[idx]
+                idx += 1
+                if eid_i not in ptb_picks and _ptb_valid(eid_i):
+                    ptb_picks.append(eid_i)
+                    progressed = True
+                    break
+            ptb_cursor[tag] = idx
+        if not progressed:
             break
 
-    return ptb_picks, ga_picks
+    if len(ptb_picks) < 15:
+        for eid in fold10.index.tolist():
+            eid_i = int(eid)
+            if eid_i not in ptb_picks and _ptb_valid(eid_i):
+                ptb_picks.append(eid_i)
+                if len(ptb_picks) >= 15:
+                    break
+
+    ga_meta = exp_app._get_georgia_meta()
+    ga_picks: List[str] = [
+        str(rid) for rid in ("E00021", "E00005", "E10019", "E00067", "E00010", "E00006")
+        if rid in ga_meta.index
+    ]
+
+    ga_clean = ga_meta[ga_meta["severity_tier"].astype(str) == "0_clean"]
+    for tag in ("AF", "LBBB", "RBBB", "IAVB", "LQT", "NSR", "MI", "STTC"):
+        if len(ga_picks) >= 10:
+            break
+        cands = ga_clean[ga_clean["_tag_set"].apply(lambda s, t=tag: t in s)].index.tolist()
+        for rid in cands:
+            r_str = str(rid)
+            if r_str in ga_picks:
+                continue
+            if exp_app._load_delineation_any(r_str, 500, 1, dataset="georgia").get("quality_ok", False):
+                ga_picks.append(r_str)
+                break
+
+    for tier_name, tier_quota in (("1_minor_warning", 2), ("2_moderate_anomaly", 2), ("3_severe_error", 1)):
+        tier_df = ga_meta[ga_meta["severity_tier"].astype(str) == tier_name]
+        added = 0
+        for rid in tier_df.index.tolist():
+            r_str = str(rid)
+            if r_str not in ga_picks:
+                ga_picks.append(r_str)
+                added += 1
+                if added >= tier_quota or len(ga_picks) >= 15:
+                    break
+
+    if len(ga_picks) < 15:
+        for rid in ga_clean.index.tolist() + ga_meta.index.tolist():
+            r_str = str(rid)
+            if r_str not in ga_picks:
+                ga_picks.append(r_str)
+                if len(ga_picks) >= 15:
+                    break
+
+    return ptb_picks[:15], ga_picks[:15]
 
 
 def _export_window_head(model: torch.nn.Module) -> dict:
@@ -144,6 +226,7 @@ def _compute_window_sweep_with_export(
     xb = torch.from_numpy(normed).to(device)
     mtype = getattr(model, "model_type", "cbm")
     K = model.num_concepts
+    N = xb.shape[0]
 
     if mtype in ("cbm", "cem"):
         z = model.encoder(xb)
@@ -153,15 +236,46 @@ def _compute_window_sweep_with_export(
         tp, c_probs, _ = model(xb)
         t_mean = tp.squeeze(-1)
         t_std = torch.zeros_like(t_mean)
-        c_std = torch.zeros_like(c_probs)
+        c_std = None
 
-    entry: Dict[str, Any] = {
-        "model_type":    mtype,
-        "task_probs":    _round_list(t_mean.cpu().numpy(), 4),
-        "task_stds":     _round_list(t_std.cpu().numpy(), 4),
-        "concept_probs": _round_list(c_probs.cpu().numpy(), 3),
-        "concept_stds":  _round_list(c_std.cpu().numpy(), 3),
-    }
+    # Batched MC-Dropout Epistemic uncertainty across all sweep windows (chunked bs=64)
+    mc_t_std_parts, mc_t_epi_parts, mc_c_std_parts = [], [], []
+    n_ale = 20 if mtype in ("cbm", "cem") else 1
+    for s in range(0, N, 64):
+        u = model.predict_with_uncertainty(xb[s : s + 64], n_mc_epistemic=10, n_mc_aleatoric=n_ale)
+        mc_t_std_parts.append(u["task_prob_std"].cpu().numpy())
+        mc_t_epi_parts.append(u["task_epistemic"].cpu().numpy())
+        if mtype in ("cbm", "cem"):
+            mc_c_std_parts.append(u["concept_probs_std"].cpu().numpy())
+
+    t_std_mc = np.concatenate(mc_t_std_parts, axis=0)
+    t_epi_mc = np.concatenate(mc_t_epi_parts, axis=0)
+
+    if mtype == "blackbox":
+        entry: Dict[str, Any] = {
+            "model_type":       mtype,
+            "task_probs":       _round_list(t_mean.cpu().numpy(), 4),
+            "task_stds":        _round_list(t_std.cpu().numpy(), 4),
+            "task_stds_mc":     _round_list(t_std_mc, 4),
+            "task_epistemic_mc": _round_list(t_epi_mc, 4),
+            "concept_probs":    None,
+            "concept_stds":     None,
+            "concept_stds_mc":  None,
+        }
+    else:
+        c_std_np = c_std.cpu().numpy()
+        c_std_mc_np = np.concatenate(mc_c_std_parts, axis=0)
+        entry = {
+            "model_type":        mtype,
+            "_cstd_scale":       255,
+            "task_probs":        _round_list(t_mean.cpu().numpy(), 4),
+            "task_stds":         _round_list(t_std.cpu().numpy(), 4),
+            "task_stds_mc":      _round_list(t_std_mc, 4),
+            "task_epistemic_mc": _round_list(t_epi_mc, 4),
+            "concept_probs":     _round_list(c_probs.cpu().numpy(), 3),
+            "concept_stds":      np.clip(np.round(c_std_np * 255.0), 0, 255).astype(np.int32).tolist(),
+            "concept_stds_mc":   np.clip(np.round(c_std_mc_np * 255.0), 0, 255).astype(np.int32).tolist(),
+        }
 
     if mtype == "cem":
         c_pos, c_neg, _, _ = model.concept_layer.compute_embeddings_and_scores(z)
@@ -291,7 +405,13 @@ def _compute_dense_export(
         }
 
     interventions: Dict[str, Dict[str, float]] = {}
+    interventions_win: Dict[str, List[List[float]]] = {}
     if m_can_int:
+        n_bins = max(1, math.ceil(T / 100))
+        x_b = x.expand(n_bins, -1, -1)
+        base_cp_b = base_out["concept_probs"].expand(n_bins, -1, -1)
+        bin_slices = [(b * 100, min(T, (b + 1) * 100)) for b in range(n_bins)]
+
         if raw_ss is not None:
             gt_arr = collapse_soft_seg_targets(raw_ss, concept_mode=c_mode, lead_idx=None)
             il_gt = torch.from_numpy(gt_arr).unsqueeze(0).to(device)
@@ -299,8 +419,15 @@ def _compute_dense_export(
             tp_gt = torch.sigmoid(model(x, intervene_labels=il_gt, intervene_mask=im_gt)["task_logits"][0].float()).cpu().numpy()
             interventions["gt"] = {name: round(float(tp_gt[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)}
 
+            il_gt_b = il_gt.expand(n_bins, -1, -1)
+            im_gt_b = torch.zeros((n_bins, 1, T), device=device)
+            for b, (s0, s1) in enumerate(bin_slices):
+                im_gt_b[b, :, s0:s1] = 1.0
+            tp_gt_w = torch.sigmoid(model(x_b, intervene_labels=il_gt_b, intervene_mask=im_gt_b)["task_logits"].float()).cpu().numpy()
+            interventions_win["gt"] = _round_list(tp_gt_w, 3)
+
         for k, cname in enumerate(c_names):
-            # Ablate k -> 0
+            # Full-record ablate k -> 0
             il_a = base_out["concept_probs"].clone()
             il_a[:, k, :] = 0.0
             im_a = torch.zeros_like(il_a)
@@ -308,27 +435,51 @@ def _compute_dense_export(
             tp_a = torch.sigmoid(model(x, intervene_labels=il_a, intervene_mask=im_a)["task_logits"][0].float()).cpu().numpy()
             interventions[f"ablate:{cname}"] = {name: round(float(tp_a[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)}
 
-            # Force k -> 1
+            # Full-record force k -> 1
             il_f = torch.zeros_like(base_out["concept_probs"])
             il_f[:, k, :] = 1.0
             im_f = torch.ones_like(il_f)
             tp_f = torch.sigmoid(model(x, intervene_labels=il_f, intervene_mask=im_f)["task_logits"][0].float()).cpu().numpy()
             interventions[f"force:{cname}"] = {name: round(float(tp_f[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)}
 
+            # Batched 1.0 s bin window-scoped interventions (n_bins=10 parallel forward passes)
+            il_aw = base_cp_b.clone()
+            im_aw = torch.zeros_like(il_aw)
+            il_fw = base_cp_b.clone()
+            im_fw = torch.zeros_like(il_fw)
+            for b, (s0, s1) in enumerate(bin_slices):
+                il_aw[b, k, s0:s1] = 0.0
+                im_aw[b, k, s0:s1] = 1.0
+                il_fw[b, :, s0:s1] = 0.0
+                il_fw[b, k, s0:s1] = 1.0
+                im_fw[b, :, s0:s1] = 1.0
+            tp_aw = torch.sigmoid(model(x_b, intervene_labels=il_aw, intervene_mask=im_aw)["task_logits"].float()).cpu().numpy()
+            tp_fw = torch.sigmoid(model(x_b, intervene_labels=il_fw, intervene_mask=im_fw)["task_logits"].float()).cpu().numpy()
+            interventions_win[f"ablate:{cname}"] = _round_list(tp_aw, 3)
+            interventions_win[f"force:{cname}"] = _round_list(tp_fw, 3)
+
+    seg_spans = _compute_seg_spans(cp) if (c_mode == "wave6" and cp.shape[0] == 6) else None
+    std_line_q = np.clip(np.round(cs.mean(axis=0) * 10000.0), 0, 10000).astype(np.int32).tolist()
+    std_line_mc_q = np.clip(np.round(cs_mc.mean(axis=0) * 10000.0), 0, 10000).astype(np.int32).tolist()
+
     return {
         "model_type":             mtype,
         "has_seg":                True,
         "supports_interventions": m_can_int,
         "concept_names":          c_names,
-        "concept_probs":          {name: _round_list(cp[i], 3) for i, name in enumerate(c_names)},
-        "concept_stds":           {name: _round_list(cs[i], 2) for i, name in enumerate(c_names)},
-        "mean_std_timeline":      _round_list(cs.mean(axis=0), 4),
-        "mean_std_timeline_mc":   _round_list(cs_mc.mean(axis=0), 4),
+        "_prob_scale":            255,
+        "_std_scale":             10000,
+        "concept_probs":          _quantize_u8_dict(cp, c_names, omit_tp=True),
+        "concept_stds":           _quantize_u8_dict(cs, c_names, omit_tp=True),
+        "seg_spans":              seg_spans,
+        "mean_std_timeline":      std_line_q,
+        "mean_std_timeline_mc":   std_line_mc_q,
         "intervals":              intervals,
         "base_pathology":         base_patho,
         "pathology_std":          {name: 0.0 for name in SUPERCLASS_NAMES},
         "pathology_std_mc":       {name: round(float(tp_std_mc[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)},
         "interventions":          interventions,
+        "interventions_win":      interventions_win,
     }
 
 
@@ -365,7 +516,7 @@ def main() -> None:
         window_heads[mid] = _export_window_head(wm)
         summaries[mid] = exp_app.model_summary(mid)
 
-    # 2. Select 6 PTB-XL + 6 Georgia curated records
+    # 2. Select 15 PTB-XL + 15 Georgia curated records
     ptb_picks, ga_picks = _select_curated_records()
     print(f"Curated PTB-XL ({len(ptb_picks)}): {ptb_picks}")
     print(f"Curated Georgia ({len(ga_picks)}): {ga_picks}")
@@ -407,8 +558,13 @@ def main() -> None:
     all_targets = [("ptbxl", eid) for eid in ptb_picks] + [("georgia", rid) for rid in ga_picks]
     for ds_name, eid in all_targets:
         rec_payload = exp_app.get_record(str(eid), model_id=win_ids[0], dataset=ds_name)
-        # Round signal to 3 decimals for compact CDN delivery
-        rec_payload["signal"] = _round_list(np.asarray(rec_payload["signal"], dtype=np.float32), 3)
+        # Re-downsample 250 Hz -> 125 Hz (ds=4 vs 500 Hz) & drop duplicate soft_seg payload
+        sig_ds2 = np.asarray(rec_payload["signal"], dtype=np.float32)
+        sig_ds4 = sig_ds2[:, ::2]
+        rec_payload["downsample"] = 4
+        rec_payload["n_samples_ds"] = int(sig_ds4.shape[1])
+        rec_payload["signal"] = _round_list(sig_ds4, 2)
+        rec_payload["soft_seg"] = None
 
         # Filtered 500 Hz windows (stride = 25)
         sig_500 = exp_app._load_filtered_signal_any(eid, 500, dataset=ds_name)
@@ -448,9 +604,11 @@ def main() -> None:
         # Dense per-timestamp models (100 Hz)
         raw_ss = archive.load(int(eid)) if (ds_name == "ptbxl" and archive is not None and int(eid) in archive) else None
         dense_gt_probs = None
+        dense_gt_spans = None
         if raw_ss is not None:
             gt_w6 = collapse_soft_seg_targets(raw_ss, concept_mode="wave6", lead_idx=None)
-            dense_gt_probs = {name: _round_list(gt_w6[i], 3) for i, name in enumerate(WAVE6_NAMES)}
+            dense_gt_probs = _quantize_u8_dict(gt_w6, WAVE6_NAMES, omit_tp=True)
+            dense_gt_spans = _compute_seg_spans(gt_w6)
 
         dense_map: Dict[str, dict] = {}
         for dmid in dense_ids:
@@ -461,7 +619,9 @@ def main() -> None:
             "sweep_gt_task":     gt_task,
             "sweep_gt_concepts": gt_concepts,
             "sweeps":            sweeps,
+            "dense_prob_scale":  255,
             "dense_gt_probs":    dense_gt_probs,
+            "dense_gt_spans":    dense_gt_spans,
             "dense":             dense_map,
         }
         out_file = REC_OUT / f"{ds_name}_{eid}.json"
@@ -478,9 +638,11 @@ def main() -> None:
             ]
         elif d["id"] == "georgia":
             d["splits"] = [
-                {"value": "0_clean",        "label": "Clean (0_clean)"},
-                {"value": "3_severe_error", "label": "Severe Error (3)"},
-                {"value": "all",            "label": "All Curated"},
+                {"value": "0_clean",            "label": "Clean (0_clean)"},
+                {"value": "1_minor_warning",    "label": "Minor Warning (1)"},
+                {"value": "2_moderate_anomaly", "label": "Moderate Anomaly (2)"},
+                {"value": "3_severe_error",     "label": "Severe Error (3)"},
+                {"value": "all",                "label": "All Curated"},
             ]
 
     manifest = {
@@ -511,6 +673,14 @@ def main() -> None:
     # 5. Copy static assets & rewrite index.html cleanly for static Vercel serving
     shutil.copytree(EXPLORER_DIR / "static", VERCEL_DIR / "static")
     html = (EXPLORER_DIR / "index.html").read_text()
+    preload_tags = (
+        '<link rel="preload" href="./data/manifest.json" as="fetch" crossorigin="anonymous" />\n  '
+        '<link rel="preload" href="./data/records/ptbxl_9.json" as="fetch" crossorigin="anonymous" />\n  '
+    )
+    html = html.replace(
+        '<link rel="stylesheet" href="/static/style.css"',
+        preload_tags + '<link rel="stylesheet" href="./static/style.css"',
+    )
     html = html.replace('href="/static/style.css"', 'href="./static/style.css"')
     html = html.replace('src="/static/vendor/d3.v7.min.js"', 'src="./static/vendor/d3.v7.min.js"')
     html = html.replace(
@@ -532,8 +702,12 @@ def main() -> None:
                 "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}],
             },
             {
+                "source": "/static/(.*)",
+                "headers": [{"key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=86400"}],
+            },
+            {
                 "source": "/data/(.*)",
-                "headers": [{"key": "Cache-Control", "value": "public, max-age=3600"}],
+                "headers": [{"key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800"}],
             },
         ],
     }
@@ -541,13 +715,13 @@ def main() -> None:
 
     readme_txt = """# ECG Heartbeat CBM & CEM Explorer — Vercel Static Deployment
 
-Zero-cold-start, static CDN build of the interactive **ECG Heartbeat CBM & CEM Explorer** supporting both **PTB-XL Fold 10** and **Georgia 12-Lead ECG (Zero-Shot OOD)** cohorts (`12` curated clinical recordings across `NORM`, `AFIB`, `LBBB/RBBB`, `MI`, `STTC`, `HYP`, `IAVB`, `LQT`, and severe artifact cases).
+Zero-cold-start, static CDN build of the interactive **ECG Heartbeat CBM & CEM Explorer** supporting both **PTB-XL Fold 10** and **Georgia 12-Lead ECG (Zero-Shot OOD)** cohorts (`30` curated clinical recordings across `NORM`, `AFIB`, `LBBB/RBBB`, `MI`, `STTC`, `HYP`, `IAVB`, `LQT`, and all 4 Georgia quality tiers).
 
 ## Why Static + Exact Linear Head Export?
 
 PyTorch CPU wheels exceed Vercel's `250 MB` serverless limit and trigger slow cold starts. Instead, [explorer/build_vercel.py](../build_vercel.py) exports:
-1. Precomputed `500 Hz` sliding-window concept probabilities (`stride = 25` samples = `50 ms`) plus exact per-window **CEM** positive/negative logits `(a⁺, a⁻)` and **CBM** linear classifier weights `(w_prob, w_var, b)` so **all test-time window concept interventions execute deterministically in browser JavaScript with `< 1e-4` error relative to PyTorch**.
-2. Precomputed `100 Hz` **DenseCEM / DenseCBM / DenseMultiTask / DenseBlackBox** soft segmentations, MC-Dropout boundary uncertainty `σ(t)`, clinical `PR / QRS / QT / HR` intervals, and full-record wave-mask interventions (`ablate` / `force` / `Apply GT Masks`).
+1. Precomputed `500 Hz` sliding-window concept probabilities (`stride = 25` samples = `50 ms`), batched **MC-Dropout Epistemic** decompositions, exact per-window **CEM** positive/negative logits `(a⁺, a⁻)`, and **CBM** linear classifier weights `(w_prob, w_var, b)` so **all test-time window concept interventions execute deterministically in browser JavaScript with `< 1e-4` error relative to PyTorch**.
+2. Precomputed `100 Hz` **DenseCEM / DenseCBM / DenseMultiTask / DenseBlackBox** `uint8`-quantized soft segmentations, precomputed wave-shading spans, MC-Dropout boundary uncertainty `σ(t)`, clinical `PR / QRS / QT / HR` intervals, and both full-record and `1.0 s` window-scoped wave-mask interventions (`ablate` / `force` / `Apply GT Masks`).
 
 You can also connect a live FastAPI GPU/CPU backend at any time by appending `?api=https://your-fastapi-host` to the deployed Vercel URL.
 

@@ -13,11 +13,14 @@ services:
     environment:
       ECG_DATA_DIR: /data
       ECG_DATA_PATH: "${ECG_DATA_PATH:-ptb-xl}"
+      ECG_GEORGIA_DIR: /georgia
+      ECG_PRECALC_DIR: /app/explorer/vercel/data
       ECG_RUNS_DIR: /app/models
       ECG_DELIN_CACHE_DIR: /app/delineation_cache
       ECG_DEFAULT_RUN: "${ECG_DEFAULT_RUN:-cem_softseg}"
     volumes:
       - "${ECG_DATA_DIR:-/nfs/data8/schlegel/git/ecg-cbm/data}:/data:ro"
+      - "${ECG_GEORGIA_DIR:-/nfs/data8/schlegel/git/ecg-data-repo/georgia_ecg}:/georgia:ro"
       - "../models:/app/models:ro"
       - "../checkpoints/dataset_cache/delineation:/app/delineation_cache:ro"
     restart: unless-stopped

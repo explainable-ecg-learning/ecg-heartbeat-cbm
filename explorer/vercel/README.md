@@ -1,12 +1,12 @@
 # ECG Heartbeat CBM & CEM Explorer — Vercel Static Deployment
 
-Zero-cold-start, static CDN build of the interactive **ECG Heartbeat CBM & CEM Explorer** supporting both **PTB-XL Fold 10** and **Georgia 12-Lead ECG (Zero-Shot OOD)** cohorts (`12` curated clinical recordings across `NORM`, `AFIB`, `LBBB/RBBB`, `MI`, `STTC`, `HYP`, `IAVB`, `LQT`, and severe artifact cases).
+Zero-cold-start, static CDN build of the interactive **ECG Heartbeat CBM & CEM Explorer** supporting both **PTB-XL Fold 10** and **Georgia 12-Lead ECG (Zero-Shot OOD)** cohorts (`30` curated clinical recordings across `NORM`, `AFIB`, `LBBB/RBBB`, `MI`, `STTC`, `HYP`, `IAVB`, `LQT`, and all 4 Georgia quality tiers).
 
 ## Why Static + Exact Linear Head Export?
 
 PyTorch CPU wheels exceed Vercel's `250 MB` serverless limit and trigger slow cold starts. Instead, [explorer/build_vercel.py](../build_vercel.py) exports:
-1. Precomputed `500 Hz` sliding-window concept probabilities (`stride = 25` samples = `50 ms`) plus exact per-window **CEM** positive/negative logits `(a⁺, a⁻)` and **CBM** linear classifier weights `(w_prob, w_var, b)` so **all test-time window concept interventions execute deterministically in browser JavaScript with `< 1e-4` error relative to PyTorch**.
-2. Precomputed `100 Hz` **DenseCEM / DenseCBM / DenseMultiTask / DenseBlackBox** soft segmentations, MC-Dropout boundary uncertainty `σ(t)`, clinical `PR / QRS / QT / HR` intervals, and full-record wave-mask interventions (`ablate` / `force` / `Apply GT Masks`).
+1. Precomputed `500 Hz` sliding-window concept probabilities (`stride = 25` samples = `50 ms`), batched **MC-Dropout Epistemic** decompositions, exact per-window **CEM** positive/negative logits `(a⁺, a⁻)`, and **CBM** linear classifier weights `(w_prob, w_var, b)` so **all test-time window concept interventions execute deterministically in browser JavaScript with `< 1e-4` error relative to PyTorch**.
+2. Precomputed `100 Hz` **DenseCEM / DenseCBM / DenseMultiTask / DenseBlackBox** `uint8`-quantized soft segmentations, precomputed wave-shading spans, MC-Dropout boundary uncertainty `σ(t)`, clinical `PR / QRS / QT / HR` intervals, and both full-record and `1.0 s` window-scoped wave-mask interventions (`ablate` / `force` / `Apply GT Masks`).
 
 You can also connect a live FastAPI GPU/CPU backend at any time by appending `?api=https://your-fastapi-host` to the deployed Vercel URL.
 
