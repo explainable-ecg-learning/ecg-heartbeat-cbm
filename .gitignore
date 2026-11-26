@@ -222,3 +222,4 @@ experiments/results/*
 !experiments/results/.gitkeep
 !experiments/results/summary.json
 !experiments/results/summary.md
+!experiments/results/external_georgia_eval.json

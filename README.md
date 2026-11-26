@@ -98,6 +98,24 @@ Per-timestamp `wave6` (`[P, PQ, QRS, ST, T, TP]`) and `fiducial24` evaluation ag
 - **Mask sharpness vs. boundary uncertainty (`DenseCEM` & heteroscedastic loss)**: `dense_cem` yields the best segmentation error-detection AUROC (`0.8884`) and strongest boundary/interior `σ` peak ratio (`2.23×`). Removing the heteroscedastic MC loss (`dense_cem_nohetero`) sharpens narrow `PQ` (`0.784 → 0.820`) at the expense of error detection (`0.8884 → 0.8604`) and boundary contrast (`2.23× → 1.86×`).
 - **Fine-grained `fiducial24` scaling**: `dense_cbm_fiducial24` scales cleanly to all 24 onset/peak/offset classes (`94.38%` acc, `0.8428` Macro-Dice, `0.8883` pathology AUROC), whereas `dense_cem_fiducial24` degrades on rare brief fiducials (`0.7215` Macro-Dice) due to `24×16`-dimensional embedding capacity competition.
 
+### 2c. Zero-Shot External Validation (Georgia 12-Lead ECG)
+PTB-XL-trained **Dense CBM / CEM / MultiTask** (`100 Hz`, no fine-tuning) and **Window SoftSeg CBM / CEM** (`500 Hz`) evaluated zero-shot across **8,770 audited `0_clean` US clinical ECGs** from **Georgia 12-Lead ECG** (`data/georgia_ecg`, [ecg-data-repo](https://github.com/explainable-ecg-learning/ecg-data-repo); `500 Hz` polyphase-resampled → `100 Hz`, canonical leads) against independent **NeuroKit2 500 Hz DWT** delineation (`n = 997` Georgia vs. `n = 499` PTB-XL Fold-10 baseline) and cardiologist **SNOMED-CT** labels:
+
+| Model (`n=1`, seed 42) | NK2 `QRS / P / T` F1 (`±150 ms`) | PTB-XL `QRS / P / T` Ceiling | HR MAE ↓ | Canon. Cycle ↑ | Bnd/Int σ ↑ | `LBBB` QRS AUROC | `IAVB` PR AUROC | 4-Class Path AUROC |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **`dense_cem_s42`** | **`0.969 / 0.948 / 0.805`** | `0.962 / 0.939 / 0.861` | **`3.51 bpm`** | **`99.35%`** | **`2.00×`** | `0.967` | **`0.903`** | **`0.8276`** |
+| `dense_cbm_detached_s42` | `0.967 / 0.942 / 0.800` | `0.961 / 0.935 / 0.858` | `3.53 bpm` | `98.85%` | `1.60×` | **`0.986`** | `0.872` | `0.8149` |
+| `dense_cbm_joint_s42` | `0.967 / 0.944 / 0.805` | `0.960 / 0.937 / 0.861` | `3.52 bpm` | `99.07%` | `1.67×` | `0.974` | `0.886` | `0.8214` |
+| `dense_multitask_s42` | `0.967 / 0.944 / 0.803` | `0.961 / 0.935 / 0.860` | `3.51 bpm` | `99.05%` | `1.66×` | `0.983` | `0.884` | `0.8258` |
+| `dense_blackbox_s42` | — | — | — | — | — | — | — | `0.8257` |
+
+![Zero-Shot External Validation on Georgia 12-Lead ECG](assets/external_georgia_segmentation.png)
+*Top 3 panels: 4.0 s Lead-II zooms from unseen Georgia ECGs (`NSR`, `RBBB|AF`, `LBBB`) showing zero-shot `DenseCBM (Detached)` wave bands, NeuroKit2 fiducials, and `DenseCEM` boundary uncertainty `σ(t)`. Bottom: PTB-XL vs. Georgia NK2 peak F1 and clinical interval separation across all `8,770` clean Georgia recordings.*
+
+- **Segmentation generalizes zero-shot without QRS/P degradation**: Zero-shot `QRS` (`0.967–0.969` F1, `8.4–8.7 ms` MAE) and non-AF `P` (`0.942–0.948` F1) match or slightly exceed the in-domain PTB-XL Fold-10 baseline, with `98.85%–99.35%` valid cardiac-cycle transition ordering, `3.5 bpm` HR MAE (`0.18 bpm` median error, `r = 0.811`), and `96.4%–97.0%` pairwise agreement across all `8.77M` Georgia timestamps.
+- **Zero-shot wave spans recover textbook clinical electrophysiology**: Across all `8,770` clean Georgia records, predicted `QRS` widens from `120 ms` (`NSR`) to `150 ms` (`LBBB`, **AUROC `0.986`**) and `140 ms` (`RBBB`, `0.927`); predicted `PR` shifts from `160 ms` to `220 ms` in 1st-degree AV block (`IAVB`, **AUROC `0.903`**); and `QT` shifts from `400 ms` to `440 ms` in `LQT` (`0.760`).
+- **Pathology & window-level transfer**: Zero-shot 4-class pathology transfer (`NORM, STTC, CD, HYP`; excluding `MI` where pure SNOMED `MI` has only `n=6` positives in Georgia) reaches **`0.8276` AUROC** with `DenseCEM` (slightly ahead of `DenseBlackBox` at `0.8257`). At `500 Hz` (`3,217` windows across `200` Georgia records), `cbm_softseg_masked` and `cem_softseg` reach `0.9797` and `0.9813` shared concept Macro-F1 (`0.8632` and `0.8729` heartbeat completeness AUROC).
+
 ### 3. Record-Level 5-Class PTB-XL Pathology (`src/pathology.py`, 20 clinical concepts)
 
 | Model | Macro-AUROC (`NORM / MI / STTC / CD / HYP`) | Concept R² | Intervened Macro-AUROC |
@@ -157,7 +175,7 @@ Open [cbm_inference.ipynb](file:///nfs/data8/schlegel/git/ecg-heartbeat-cbm/cbm_
 - Per-timestamp **DenseSoftSegCBM** vs. **DenseSoftSegCEM** (`100 Hz`) wave masks, boundary uncertainty decomposition `σ(t)`, and live temporal wave-mask interventions on 5-class cardiac pathology
 - Challenging Fold-10 clinical ECGs (`AFIB`, `CLBBB/CRBBB`, `MI`)
 
-### 4. Interactive Web Explorer (Local & Docker, Port `8040`)
+### 4. Interactive Web Explorer (Local, Docker & Vercel)
 
 ```bash
 # Run locally (defaults to 127.0.0.1:8040 for SSH port forwarding)
@@ -171,13 +189,18 @@ docker compose up --build
 # Or via Docker Compose with NVIDIA GPU acceleration
 cd explorer
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+
+# Or preview/deploy zero-cold-start static Vercel bundle (explorer/vercel/, ~7.7 MB)
+CUDA_VISIBLE_DEVICES=0 python explorer/build_vercel.py
+python3 -m http.server 8041 --directory explorer/vercel
 ```
 
-The Explorer (`http://127.0.0.1:8040`) features a minimal editorial UI, startup background pre-warming, single-round-trip `/bootstrap`, `BF16` GPU inference, LRU response caching, and `GZip` compression:
+The Explorer (`http://127.0.0.1:8040`) features a minimal editorial UI, dataset switcher (**PTB-XL** ↔ **Georgia 12-Lead OOD**), live model comparison, and strict JSON validation:
+- **Dataset & Record Controls**: Switch dynamically between **PTB-XL** (`Fold 10` / `Fold 9`) and **Georgia 12-Lead (OOD)** filtered by quality tier (`0_clean`..`3_severe_error`), condition (`NORM, STTC, CD, HYP, AFIB, BBB, IAVB, LQT`), or search (`E00021`, `E00005`, `E10019` pinned at top).
 - **Waveform & Sliding-Window View**: 12-lead selector, draggable 1.0 s window, Play/Pause sweep, per-timestamp **Waveform Seg Shading** (`Dense CEM`, `Dense CBM`, `Zenodo GT`), Primary vs. Compare overlays, and concept heatmap.
 - **Window Pipeline & Live Interventions**: Clickable concept pills (`Auto → 1 → 0`), `±1σ` uncertainty bars, and optional MC-Dropout epistemic decomposition.
-- **Per-Timestamp Soft Segmentation & 5-Class Pathology**: Interactive comparison (`Dense CEM vs. Zenodo GT`, `Dense CBM vs. Zenodo GT`, `Dense CEM vs. Dense CBM`), synchronized boundary uncertainty strip `σ(t)`, hover timestamp readout, and live wave-mask interventions (`Auto → Ablate 0 → Force 1` or `Apply GT Masks`, scoped to full 10 s record or selected 1.0 s window).
-- **Test Benchmarks**: Live side-by-side metric tables and interactive Concept Intervention Curves.
+- **Per-Timestamp Soft Segmentation & 5-Class Pathology**: 3-way comparison (`DenseCEM`, `DenseCBM`, `DenseBlackBox`) with live predicted `PR / QRS / QT / HR` clinical intervals, synchronized boundary uncertainty strip `σ(t)`, hover readout, and wave-mask interventions (`Auto → Ablate 0 → Force 1` or `Apply GT Masks` on PTB-XL).
+- **Test & Zero-Shot Benchmarks**: Live side-by-side PTB-XL Fold-10 and Georgia 12-Lead Zero-Shot (`8,770` clean ECGs) benchmark tables alongside Concept Intervention Curves.
 
 ---
 
@@ -200,11 +223,14 @@ experiments/
   run_dense_softseg.sh   — Per-timestamp 1D U-Net DenseSoftSegCBM & DenseSoftSegCEM (100 Hz)
   run_dense_paper_suite.sh — Full 3-seed baselines, ablations (fiducial24/RandInt/hetero) & leakage fixes
   run_pathology.sh       — Record-level 5-class PTB-XL pathology (CBM / CEM / Black-Box)
+  eval_external_georgia.py — Zero-shot external evaluation on Georgia 12-Lead ECG (ecg-data-repo)
+  plot_external_georgia.py — Editorial waveform + OOD benchmark figure generator (assets/external_georgia_segmentation.png)
   collect_results.py     — Aggregates single-run & multi-seed metrics into experiments/results/summary.{json,md}
   results/               — Saved experiment outputs & summary.{json,md} (.gitkeep tracked)
 src/
   utils.py               — Shared deterministic seeding & record-level bootstrap 95% CIs
   data.py                — PTBXLDataset, HeartbeatDataset, config-fingerprinted caching, NeuroKit2 & soft_seg builders
+  external_data.py       — External 12-lead ECG loader (Georgia ECG), lead alignment, SNOMED mapping & interval extractor
   models.py              — TemporalEncoder, CBMWithUncertainty, CEMWithUncertainty, BlackBoxWithUncertainty
   losses.py              — CombinedCBMLoss (task + variance-regularised heteroscedastic BCE + consistency)
   evaluate.py            — Masked concept metrics, ECE/Brier, interventions, uncertainty, faithfulness & OIS
@@ -214,9 +240,11 @@ src/
   dense_seg.py           — Per-timestamp 1D U-Net DenseSoftSegCBM & DenseSoftSegCEM (100 Hz, BF16/TF32)
   pathology.py           — Downstream 5-class PTB-XL cardiac pathology CBM / CEM / Black-Box
 explorer/
-  app.py                 — FastAPI backend (/bootstrap, /sweep, /infer, /dense-infer, GZip, BF16, LRU caches)
+  app.py                 — FastAPI backend (/datasets, /records, /sweep, /infer, /dense-infer)
   index.html             — Minimal editorial D3 v7 UI
-  static/                — Frontend JS, CSS, and vendored D3 v7 (offline-ready)
+  static/                — Frontend JS (live + static Vercel adapter), CSS, and vendored D3 v7
+  build_vercel.py        — Static CDN + exact linear head exporter for zero-cold-start Vercel hosting
+  vercel/                — Deployable Vercel root directory (vercel.json, static UI + 12 curated ECG bundles)
   run.sh                 — Local Uvicorn launch script (defaults to 127.0.0.1:8040)
   Dockerfile             — Self-contained Explorer container image (BuildKit context: repo root)
   Dockerfile.dockerignore

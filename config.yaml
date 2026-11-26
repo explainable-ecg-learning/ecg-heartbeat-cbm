@@ -80,3 +80,12 @@ inference:
   cem_run_dir: "models/cem_softseg"
   dense_cbm_run_dir: "models/dense_cbm_softseg"
   dense_cem_run_dir: "models/dense_cem_softseg"
+
+external_datasets:
+  georgia_ecg:
+    root: "data/georgia_ecg"
+    data_subdir: "data"
+    error_labels_csv: "quality/error_labels.csv"
+    sampling_rate: 500
+    target_sr: 100
+    max_error_severity: 0

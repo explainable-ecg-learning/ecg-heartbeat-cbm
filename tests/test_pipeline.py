@@ -34,6 +34,13 @@ from dense_seg import (  # noqa: E402
     evaluate_dense_leakage_probe,
     evaluate_dense_task_uncertainty,
 )
+from external_data import (  # noqa: E402
+    CANONICAL_LEADS,
+    canonicalize_leads,
+    extract_wave_spans_and_intervals,
+    map_snomed_to_superclasses,
+    preprocess_to_dense_100hz,
+)
 from utils import bootstrap_multilabel_auroc, set_seed  # noqa: E402
 
 
@@ -319,6 +326,140 @@ class TestECGModelsAndPipeline(unittest.TestCase):
         yp = np.clip(yt * 0.8 + 0.1, 0.0, 1.0)
         bci = bootstrap_multilabel_auroc(yt, yp, ["NORM", "MI", "STTC", "CD", "HYP"], n_boot=50, seed=0)
         self.assertAlmostEqual(bci["pathology/macro_auroc_ci95_lo"], 1.0, places=5)
+
+    def test_external_georgia_preprocessing_and_intervals(self) -> None:
+        # 1. Lead canonicalization
+        perm_names = ["v6", "II", "aVR", "I", "III", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5"]
+        raw = np.arange(12 * 100, dtype=np.float32).reshape(12, 100)
+        canon = canonicalize_leads(raw, perm_names)
+        self.assertEqual(canon.shape, (12, 100))
+        self.assertTrue(np.allclose(canon[0], raw[3]))  # I
+        self.assertTrue(np.allclose(canon[1], raw[1]))  # II
+        self.assertTrue(np.allclose(canon[3], raw[2]))  # aVR
+        with self.assertRaises(ValueError):
+            canonicalize_leads(raw[:11], CANONICAL_LEADS[:11])
+
+        # 2. 500 Hz -> 100 Hz preprocessing + 60 Hz suppression + edge-pad for short signals
+        fs = 500
+        t = np.arange(fs * 10, dtype=np.float32) / fs
+        ecg_like = np.sin(2.0 * np.pi * 1.2 * t) + 0.5 * np.sin(2.0 * np.pi * 60.0 * t)
+        sig_500 = np.tile(ecg_like, (12, 1)).astype(np.float32)
+        sig_500[0, 100] = np.nan
+        out_100 = preprocess_to_dense_100hz(sig_500, fs=500, target_sr=100, target_sec=10.0)
+        self.assertEqual(out_100.shape, (12, 1000))
+        self.assertTrue(np.isfinite(out_100).all())
+        self.assertAlmostEqual(float(out_100[1].mean()), 0.0, places=4)
+        self.assertAlmostEqual(float(out_100[1].std()), 1.0, delta=0.05)
+
+        short_100 = preprocess_to_dense_100hz(sig_500[:, :2500], fs=500, target_sr=100, target_sec=10.0)
+        self.assertEqual(short_100.shape, (12, 1000))
+
+        # 3. SNOMED-CT -> PTB-XL 5-superclass mapping
+        self.assertEqual(map_snomed_to_superclasses(["426783006"]).tolist(), [1, 0, 0, 0, 0])         # NSR only -> NORM
+        self.assertEqual(map_snomed_to_superclasses(["426783006", "164889003"]).tolist(), [0, 0, 0, 0, 0])  # AF excludes NORM
+        self.assertEqual(map_snomed_to_superclasses(["164909002"]).tolist(), [0, 0, 0, 1, 0])         # LBBB -> CD
+        self.assertEqual(map_snomed_to_superclasses(["164873001", "59931005"]).tolist(), [0, 0, 1, 0, 1])  # LVH + TInv -> STTC+HYP
+
+        # 4. Wave-span clinical interval extraction on synthetic periodic wave6 cycle (60 bpm)
+        cycle = np.array(
+            [0] * 10 + [1] * 6 + [2] * 10 + [3] * 10 + [4] * 20 + [5] * 44,
+            dtype=np.int64,
+        )  # 100 samples = 1.0 s -> PR=160ms, QRS=100ms, QT=400ms
+        seq = np.tile(cycle, 10)[:1000]
+        info = extract_wave_spans_and_intervals(seq, fs=100)
+        self.assertEqual(info["n_beats"], 10)
+        self.assertAlmostEqual(info["pred_hr_bpm"], 60.0, delta=1.0)
+        self.assertAlmostEqual(info["qrs_ms"], 100.0, delta=1.0)
+        self.assertAlmostEqual(info["pr_ms"], 160.0, delta=1.0)
+        self.assertAlmostEqual(info["qt_ms"], 400.0, delta=1.0)
+        self.assertAlmostEqual(info["p_present_beat_frac"], 1.0, places=5)
+        self.assertAlmostEqual(info["canonical_transition_rate"], 1.0, places=5)
+
+    def test_explorer_georgia_and_ptbxl_endpoints(self) -> None:
+        exp_dir = REPO_ROOT / "explorer"
+        if str(exp_dir) not in sys.path:
+            sys.path.insert(0, str(exp_dir))
+        import app as exp_app  # noqa: E402
+
+        if not exp_app._has_georgia():
+            self.skipTest("Georgia dataset symlink not present")
+
+        ds_payload = exp_app.list_datasets()
+        ds_ids = [d["id"] for d in ds_payload["datasets"]]
+        self.assertIn("ptbxl", ds_ids)
+        self.assertIn("georgia", ds_ids)
+
+        rec_list = exp_app.list_records(limit=10, fold="0_clean", dataset="georgia")
+        self.assertEqual(rec_list["dataset"], "georgia")
+        self.assertGreater(rec_list["total"], 8000)
+        self.assertEqual(rec_list["record_ids"][:3], ["E00021", "E00005", "E10019"])
+
+        rec_ga = exp_app.get_record("E00021", dataset="georgia")
+        self.assertEqual(rec_ga["dataset"], "georgia")
+        self.assertFalse(rec_ga["has_soft_seg_gt"])
+        self.assertEqual(len(rec_ga["signal"]), 12)
+
+        dense_runs = exp_app.discover_dense_runs()
+        if "dense_cem_s42" in dense_runs:
+            dreq = exp_app.DenseInferRequest(
+                ecg_id="E10019",
+                dataset="georgia",
+                model_id="dense_cem_s42",
+                compare_model_id="dense_cbm_detached_s42" if "dense_cbm_detached_s42" in dense_runs else None,
+                blackbox_model_id="dense_blackbox_s42" if "dense_blackbox_s42" in dense_runs else None,
+            )
+            dres = exp_app.dense_infer(dreq)
+            self.assertEqual(dres["dataset"], "georgia")
+            self.assertIsNone(dres["gt_probs"])
+            self.assertIn("qrs_ms", dres["intervals"])
+            self.assertGreater(dres["intervals"]["qrs_ms"], 120.0)
+
+    def test_vercel_exact_intervention_math(self) -> None:
+        exp_dir = REPO_ROOT / "explorer"
+        if str(exp_dir) not in sys.path:
+            sys.path.insert(0, str(exp_dir))
+        import build_vercel  # noqa: E402
+
+        torch.manual_seed(0)
+        x = torch.randn(2, 12, 120)
+        int_dict = {0: 1.0, 2: 0.0, 4: 1.0, 7: 0.0}
+        int_labels = torch.zeros(2, 10)
+        int_mask = torch.zeros(2, 10)
+        for k, v in int_dict.items():
+            int_labels[:, k] = v
+            int_mask[:, k] = 1.0
+
+        for mtype in ("cem", "cbm"):
+            cfg = self._base_cfg(mtype)
+            cfg["data"]["delineator"] = "soft_seg"
+            cfg["model"]["concept_layer"]["mask_unsupervised_concepts"] = True
+            model = build_model(cfg).eval()
+            head = build_vercel._export_window_head(model)
+            sw_entry, xb_np = build_vercel._compute_window_sweep_with_export(model, cfg, x.numpy(), "cpu")
+
+            with torch.no_grad():
+                pt_out = model.intervene(torch.from_numpy(xb_np), int_labels, int_mask)
+
+            inactive = set(head.get("inactive_concepts", []))
+            for bi in range(2):
+                logit = float(head["bias"])
+                c_probs = sw_entry["concept_probs"][bi]
+                if mtype == "cem":
+                    for k in range(10):
+                        p_eff = 0.0 if k in inactive else int_dict.get(k, c_probs[k])
+                        logit += p_eff * sw_entry["a_pos"][bi][k] + (1.0 - p_eff) * sw_entry["a_neg"][bi][k]
+                else:
+                    v_zero = float(np.exp(-20.0))
+                    for k in range(10):
+                        if k in inactive:
+                            p_eff, v_eff = 0.0, 0.0
+                        elif k in int_dict:
+                            p_eff, v_eff = int_dict[k], v_zero
+                        else:
+                            p_eff, v_eff = c_probs[k], sw_entry["c_vars"][bi][k]
+                        logit += head["w_prob"][k] * p_eff + (head["w_var"][k] * v_eff if head["use_uncertainty"] else 0.0)
+                exp_prob = 1.0 / (1.0 + float(np.exp(-np.clip(logit, -30.0, 30.0))))
+                self.assertAlmostEqual(float(pt_out[bi, 0].item()), exp_prob, delta=5e-3)
 
 
 if __name__ == "__main__":

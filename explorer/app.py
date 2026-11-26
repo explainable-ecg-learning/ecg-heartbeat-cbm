@@ -22,7 +22,7 @@ import sys
 import threading
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -34,6 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from scipy.signal import resample_poly
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -47,6 +48,13 @@ from data import (  # noqa: E402
 )
 from models import CONCEPT_NAMES, build_model  # noqa: E402
 from dense_seg import SUPERCLASS_NAMES, build_dense_model, collapse_soft_seg_targets, get_dense_concept_names  # noqa: E402
+from external_data import (  # noqa: E402
+    CANONICAL_LEADS,
+    canonicalize_leads,
+    extract_wave_spans_and_intervals,
+    load_georgia_metadata,
+    map_snomed_to_superclasses,
+)
 from soft_seg import SoftSegArchive, soft_seg_to_wave_curves, soft_window_concept_probs  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -94,8 +102,26 @@ def _load_paths() -> Tuple[Path, Path, Path, str, str]:
 
 
 RUNS_DIR, DATA_PATH, DELIN_CACHE_DIR, DEFAULT_RUN_KEY, SOFT_SEG_REL = _load_paths()
+
+
+def _load_external_paths() -> Tuple[Path, Path]:
+    cfg: dict = {}
+    cfg_file = REPO_ROOT / "config.yaml"
+    if cfg_file.exists():
+        with open(cfg_file) as f:
+            cfg = yaml.safe_load(f) or {}
+    ext_cfg = cfg.get("external_datasets", {}).get("georgia_ecg", {})
+    raw_ga = os.environ.get("ECG_GEORGIA_DIR", ext_cfg.get("root", "data/georgia_ecg"))
+    ga_path = Path(raw_ga)
+    if not ga_path.is_absolute():
+        ga_path = REPO_ROOT / ga_path
+    bench_path = REPO_ROOT / "experiments" / "results" / "external_georgia_eval.json"
+    return ga_path, bench_path
+
+
+GEORGIA_ROOT, EXTERNAL_BENCH_PATH = _load_external_paths()
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-logger.info(f"Explorer starting | device={DEVICE} | runs={RUNS_DIR} | data={DATA_PATH}")
+logger.info(f"Explorer starting | device={DEVICE} | runs={RUNS_DIR} | data={DATA_PATH} | georgia={GEORGIA_ROOT}")
 
 # Optional Zenodo 7610236 (ECGdeli U-Net) soft segmentation archive
 _SOFT_SEG_ARCHIVE: Optional[SoftSegArchive] = None
@@ -387,6 +413,144 @@ def _valid_int_list(arr) -> List[int]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Georgia 12-Lead ECG (External OOD) Metadata, Signal & Delineation Cache
+# ─────────────────────────────────────────────────────────────────────────────
+
+GEORGIA_RHYTHM_GROUPS: Dict[str, set] = {
+    "AFIB": {"164889003", "164890007"},
+    "BBB":  {"164909002", "251120003", "59118001", "713427006", "713426002", "6374002"},
+    "IAVB": {"270492004"},
+    "LQT":  {"111975006"},
+    "PVC":  {"17338001", "284470004", "63593006", "427172004"},
+}
+GEORGIA_SHOWCASE_IDS: List[str] = ["E00021", "E00005", "E10019"]
+
+_GEORGIA_META: Optional[pd.DataFrame] = None
+_GEORGIA_LOCK = threading.Lock()
+
+
+def _has_georgia() -> bool:
+    return (GEORGIA_ROOT / "quality" / "error_labels.csv").exists() and (GEORGIA_ROOT / "data").exists()
+
+
+def _get_georgia_meta() -> pd.DataFrame:
+    global _GEORGIA_META
+    with _GEORGIA_LOCK:
+        if _GEORGIA_META is None:
+            if not _has_georgia():
+                raise HTTPException(status_code=503, detail=f"Georgia 12-Lead ECG not found under {GEORGIA_ROOT}")
+            df = load_georgia_metadata(GEORGIA_ROOT, max_error_severity=None, require_10s_500hz=True)
+
+            dx_lists, label_lists, tag_sets = [], [], []
+            sex_ints, sex_labels = [], []
+            for _, row in df.iterrows():
+                scodes_str = str(row.get("snomed_codes", ""))
+                cset = {c.strip() for c in scodes_str.split("|") if c.strip()}
+                sc_vec = map_snomed_to_superclasses(scodes_str)
+                dx = [SUPERCLASS_NAMES[i] for i, v in enumerate(sc_vec) if v > 0.5]
+                lbls = [s.strip() for s in str(row.get("label_names", "")).split("|") if s.strip()]
+                tags = set(dx)
+                for grp, kws in GEORGIA_RHYTHM_GROUPS.items():
+                    if not cset.isdisjoint(kws):
+                        tags.add(grp)
+
+                raw_sex = str(row.get("sex", "")).strip().lower()
+                if raw_sex.startswith("m"):
+                    sx_i, sx_l = 0, "M"
+                elif raw_sex.startswith("f"):
+                    sx_i, sx_l = 1, "F"
+                else:
+                    sx_i, sx_l = -1, ""
+
+                dx_lists.append(dx)
+                label_lists.append(lbls)
+                tag_sets.append(tags)
+                sex_ints.append(sx_i)
+                sex_labels.append(sx_l)
+
+            df["_dx_list"] = dx_lists
+            df["_snomed_labels"] = label_lists
+            df["_tag_set"] = tag_sets
+            df["_sex_int"] = sex_ints
+            df["_sex_label"] = sex_labels
+            df = df.set_index("record_id", drop=False)
+            _GEORGIA_META = df
+            logger.info(f"Loaded Georgia 12-Lead metadata: {len(_GEORGIA_META)} valid 10s records")
+        return _GEORGIA_META
+
+
+@lru_cache(maxsize=16)
+def _load_georgia_filtered_signal(record_id: str, sampling_rate: int = 500) -> np.ndarray:
+    meta = _get_georgia_meta()
+    rid = str(record_id)
+    if rid not in meta.index:
+        raise HTTPException(status_code=404, detail=f"Georgia record '{rid}' not found")
+    row = meta.loc[rid]
+    rec_path = str(GEORGIA_ROOT / "data" / str(row["record_path"]))
+    raw, fields = wfdb.rdsamp(rec_path)
+    src_fs = int(fields.get("fs", row.get("fs", 500)))
+    canon = canonicalize_leads(raw.T, fields.get("sig_name", CANONICAL_LEADS))
+    canon = np.nan_to_num(canon.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    if src_fs != sampling_rate:
+        if src_fs == 500 and sampling_rate == 100:
+            canon = resample_poly(canon, 1, 5, axis=-1).astype(np.float32)
+        else:
+            from fractions import Fraction
+            frac = Fraction(int(sampling_rate), int(src_fs))
+            canon = resample_poly(canon, frac.numerator, frac.denominator, axis=-1).astype(np.float32)
+    filtered = bandpass_filter(canon, sampling_rate=sampling_rate, lowcut=0.5, highcut=40.0)
+    filtered.setflags(write=False)
+    return filtered
+
+
+@lru_cache(maxsize=32)
+def _load_georgia_delineation(record_id: str, sampling_rate: int = 500, lead_idx: int = 1) -> dict:
+    sig = _load_georgia_filtered_signal(record_id, sampling_rate)
+    return delineate_record(sig, sampling_rate=sampling_rate, lead_idx=lead_idx)
+
+
+def _normalize_dataset(dataset: Optional[str]) -> str:
+    ds = (dataset or "ptbxl").strip().lower()
+    if ds in ("ptbxl", "ptb-xl"):
+        return "ptbxl"
+    if ds in ("georgia", "georgia_ecg"):
+        if not _has_georgia():
+            raise HTTPException(status_code=503, detail=f"Georgia dataset not available under {GEORGIA_ROOT}")
+        return "georgia"
+    raise HTTPException(status_code=400, detail=f"Unknown dataset '{dataset}'. Expected 'ptbxl' or 'georgia'.")
+
+
+def _parse_ptbxl_id(ecg_id: Union[int, str]) -> int:
+    try:
+        return int(ecg_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail=f"Invalid PTB-XL ecg_id '{ecg_id}'; expected integer.")
+
+
+def _load_filtered_signal_any(ecg_id: Union[int, str], sampling_rate: int = 500, dataset: str = "ptbxl") -> np.ndarray:
+    ds = _normalize_dataset(dataset)
+    if ds == "georgia":
+        return _load_georgia_filtered_signal(str(ecg_id), sampling_rate)
+    return _load_filtered_signal(_parse_ptbxl_id(ecg_id), sampling_rate)
+
+
+def _load_delineation_any(
+    ecg_id: Union[int, str], sampling_rate: int = 500, lead_idx: int = 0, dataset: str = "ptbxl"
+) -> dict:
+    ds = _normalize_dataset(dataset)
+    if ds == "georgia":
+        eff_lead = 1 if lead_idx == 0 else lead_idx
+        return _load_georgia_delineation(str(ecg_id), sampling_rate, eff_lead)
+    return _load_delineation(_parse_ptbxl_id(ecg_id), sampling_rate, lead_idx)
+
+
+def _safe_round(val: Optional[float], digits: int = 1) -> Optional[float]:
+    if val is None or not np.isfinite(val):
+        return None
+    return round(float(val), digits)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Batched Inference Helper (Unified Aleatoric + Optional Epistemic)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -503,7 +667,8 @@ def root():
 
 
 class InferRequest(BaseModel):
-    ecg_id: int
+    ecg_id: Union[int, str]
+    dataset: str = "ptbxl"
     start: int
     model_id: Optional[str] = None
     compare_model_id: Optional[str] = None
@@ -512,7 +677,8 @@ class InferRequest(BaseModel):
 
 
 class SweepRequest(BaseModel):
-    ecg_id: int
+    ecg_id: Union[int, str]
+    dataset: str = "ptbxl"
     stride: int = 20
     model_id: Optional[str] = None
     compare_model_id: Optional[str] = None
@@ -569,15 +735,120 @@ def model_summary(model_id: str):
     }
 
 
+@app.get("/datasets")
+def list_datasets():
+    datasets = [
+        {
+            "id":              "ptbxl",
+            "label":           "PTB-XL (German)",
+            "split_label":     "Split",
+            "has_soft_seg_gt": _get_soft_seg_archive() is not None,
+            "default_record":  "9",
+            "default_split":   "10",
+            "splits": [
+                {"value": "10",  "label": "Test (Fold 10)"},
+                {"value": "9",   "label": "Val (Fold 9)"},
+                {"value": "all", "label": "All Folds"},
+            ],
+            "conditions": ["ALL", "NORM", "MI", "STTC", "CD", "HYP", "AFIB", "BBB", "PVC"],
+        }
+    ]
+    if _has_georgia():
+        datasets.append({
+            "id":              "georgia",
+            "label":           "Georgia 12-Lead (US · OOD)",
+            "split_label":     "Quality",
+            "has_soft_seg_gt": False,
+            "default_record":  GEORGIA_SHOWCASE_IDS[0],
+            "default_split":   "0_clean",
+            "splits": [
+                {"value": "0_clean",            "label": "Clean (0_clean)"},
+                {"value": "1_minor_warning",    "label": "Minor Warning (1)"},
+                {"value": "2_moderate_anomaly", "label": "Moderate Anomaly (2)"},
+                {"value": "3_severe_error",     "label": "Severe Error (3)"},
+                {"value": "all",                "label": "All Valid 10s"},
+            ],
+            "conditions": ["ALL", "NORM", "STTC", "CD", "HYP", "MI", "AFIB", "BBB", "IAVB", "LQT", "PVC"],
+        })
+    return {"default_dataset": "ptbxl", "datasets": datasets}
+
+
+@app.get("/external-benchmark")
+def get_external_benchmark():
+    data = _read_json_if_exists(EXTERNAL_BENCH_PATH)
+    if data is None:
+        return {"available": False}
+    return {"available": True, **data}
+
+
 @app.get("/records")
 def list_records(
     limit: int = 300,
-    fold: Optional[int] = 10,
+    fold: Optional[str] = "10",
     dx: Optional[str] = None,
     search: Optional[str] = None,
+    dataset: str = "ptbxl",
 ):
+    ds = _normalize_dataset(dataset)
+    if ds == "georgia":
+        meta = _get_georgia_meta()
+        subset = meta
+        fval = (fold or "0_clean").strip()
+        if fval.lower() not in ("all", ""):
+            if fval == "10":
+                fval = "0_clean"
+            subset = subset[subset["severity_tier"].astype(str) == fval]
+
+        if dx and dx.upper() != "ALL":
+            tag = dx.upper()
+            subset = subset[subset["_tag_set"].apply(lambda s: tag in s)]
+
+        q = (search or "").strip().lower()
+        if q:
+            m_id = subset["record_id"].astype(str).str.lower().str.contains(q, regex=False)
+            m_dx = subset["label_names"].astype(str).str.lower().str.contains(q, regex=False)
+            subset = subset[m_id | m_dx]
+
+        total = len(subset)
+        sub_head = subset.iloc[:limit]
+
+        # Pin curated NSR / AF / LBBB showcase records at the top of default 0_clean view
+        if not q and (not dx or dx.upper() == "ALL") and fval in ("0_clean", "all", ""):
+            pinned = [rid for rid in GEORGIA_SHOWCASE_IDS if rid in subset.index]
+            if pinned:
+                rest = sub_head.loc[~sub_head.index.isin(pinned)].iloc[: max(0, limit - len(pinned))]
+                sub_head = pd.concat([subset.loc[pinned], rest])
+
+        records = [
+            {
+                "ecg_id":        str(row["record_id"]),
+                "dataset":       "georgia",
+                "severity_tier": str(row["severity_tier"]),
+                "age":           float(row["age"]) if pd.notna(row.get("age")) else 0.0,
+                "sex":           int(row["_sex_int"]),
+                "sex_label":     str(row["_sex_label"]),
+                "dx":            row["_dx_list"],
+                "label_names":   row["_snomed_labels"],
+                "tags":          sorted(row["_tag_set"]),
+                "est_hr_bpm":    _safe_round(row.get("est_hr_bpm"), 1),
+            }
+            for _, row in sub_head.iterrows()
+        ]
+        return {
+            "dataset":    "georgia",
+            "record_ids": [r["ecg_id"] for r in records],
+            "records":    records,
+            "total":      total,
+        }
+
     meta = _get_meta()
-    subset = meta[meta["strat_fold"] == fold] if fold is not None else meta
+    if fold is not None and str(fold).strip().lower() not in ("all", ""):
+        try:
+            subset = meta[meta["strat_fold"] == int(fold)]
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid PTB-XL fold '{fold}'.")
+    else:
+        subset = meta
 
     if dx and dx.upper() != "ALL":
         tag = dx.upper()
@@ -590,16 +861,18 @@ def list_records(
     sub_head = subset.iloc[:limit]
     records = [
         {
-            "ecg_id": int(eid),
-            "fold":   int(row.get("strat_fold", 0)),
-            "age":    float(row["age"]) if not pd.isna(row.get("age")) else 0.0,
-            "sex":    int(row["sex"]) if not pd.isna(row.get("sex")) else 0,
-            "dx":     row["_dx_list"],
-            "tags":   sorted(row["_tag_set"]),
+            "ecg_id":  int(eid),
+            "dataset": "ptbxl",
+            "fold":    int(row.get("strat_fold", 0)),
+            "age":     float(row["age"]) if not pd.isna(row.get("age")) else 0.0,
+            "sex":     int(row["sex"]) if not pd.isna(row.get("sex")) else 0,
+            "dx":      row["_dx_list"],
+            "tags":    sorted(row["_tag_set"]),
         }
         for eid, row in sub_head.iterrows()
     ]
     return {
+        "dataset":    "ptbxl",
         "record_ids": [r["ecg_id"] for r in records],
         "records":    records,
         "total":      len(subset),
@@ -607,16 +880,16 @@ def list_records(
 
 
 @app.get("/record/{ecg_id}")
-def get_record(ecg_id: int, model_id: Optional[str] = None):
+def get_record(ecg_id: str, model_id: Optional[str] = None, dataset: str = "ptbxl"):
+    ds_name = _normalize_dataset(dataset)
     _, _, cfg = get_model_and_cfg(model_id)
     sr       = int(cfg.get("data", {}).get("sampling_rate", 500))
     t_fixed  = int(cfg.get("data", {}).get("t_fixed", 500))
     lead_idx = int(cfg.get("data", {}).get("lead", 0))
 
-    signal_filt = _load_filtered_signal(ecg_id, sr)
+    signal_filt = _load_filtered_signal_any(ecg_id, sr, dataset=ds_name)
     signal_disp = z_normalize(signal_filt)
-    meta        = _get_meta().loc[ecg_id]
-    delin       = _load_delineation(ecg_id, sr, lead_idx)
+    delin       = _load_delineation_any(ecg_id, sr, lead_idx, dataset=ds_name)
     d_map       = delin.get("delineation", {})
 
     _, T = signal_disp.shape
@@ -624,12 +897,46 @@ def get_record(ecg_id: int, model_id: Optional[str] = None):
     signal_ds = signal_disp[:, ::ds]
     lead_names = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
 
+    if ds_name == "georgia":
+        meta = _get_georgia_meta()
+        rid = str(ecg_id)
+        row = meta.loc[rid]
+        return {
+            "ecg_id":          rid,
+            "dataset":         "georgia",
+            "sampling_rate":   sr,
+            "t_fixed":         t_fixed,
+            "n_samples":       T,
+            "n_samples_ds":    signal_ds.shape[1],
+            "downsample":      ds,
+            "leads":           lead_names,
+            "signal":          signal_ds.tolist(),
+            "age":             float(row["age"]) if pd.notna(row.get("age")) else 0.0,
+            "sex":             int(row["_sex_int"]),
+            "sex_label":       str(row["_sex_label"]),
+            "severity_tier":   str(row["severity_tier"]),
+            "est_hr_bpm":      _safe_round(row.get("est_hr_bpm"), 1),
+            "dx":              row["_dx_list"],
+            "label_names":     row["_snomed_labels"],
+            "tags":            sorted(row["_tag_set"]),
+            "has_soft_seg_gt": False,
+            "delineation": {
+                "quality_ok": bool(delin.get("quality_ok", False)),
+                "r_peaks":    _valid_int_list(delin.get("r_peaks", [])),
+                "p_peaks":    _valid_int_list(d_map.get("ECG_P_Peaks", [])),
+                "t_peaks":    _valid_int_list(d_map.get("ECG_T_Peaks", [])),
+            },
+            "soft_seg":        None,
+        }
+
+    eid_int = _parse_ptbxl_id(ecg_id)
+    meta = _get_meta().loc[eid_int]
     # Optional Zenodo 7610236 (ECGdeli U-Net) per-timestep soft segmentation envelopes (100 Hz)
     soft_seg_payload = None
     archive = _get_soft_seg_archive()
-    if archive is not None and ecg_id in archive:
+    if archive is not None and eid_int in archive:
         try:
-            ss = archive.load(ecg_id)
+            ss = archive.load(eid_int)
             env = soft_seg_to_wave_curves(ss, lead_idx=lead_idx)
             soft_seg_payload = {
                 "sampling_rate": 100,
@@ -639,33 +946,39 @@ def get_record(ecg_id: int, model_id: Optional[str] = None):
                 "T":   np.round(env["T"],   3).tolist(),
             }
         except Exception as exc:
-            logger.warning(f"Failed loading soft_seg for ecg_id={ecg_id}: {exc}")
+            logger.warning(f"Failed loading soft_seg for ecg_id={eid_int}: {exc}")
 
     return {
-        "ecg_id":        ecg_id,
-        "sampling_rate": sr,
-        "t_fixed":       t_fixed,
-        "n_samples":     T,
-        "n_samples_ds":  signal_ds.shape[1],
-        "downsample":    ds,
-        "leads":         lead_names,
-        "signal":        signal_ds.tolist(),
-        "age":           float(meta["age"]) if not pd.isna(meta.get("age")) else 0.0,
-        "sex":           int(meta["sex"]) if not pd.isna(meta.get("sex")) else 0,
-        "dx":            meta["_dx_list"],
-        "tags":          sorted(meta["_tag_set"]),
+        "ecg_id":          eid_int,
+        "dataset":         "ptbxl",
+        "sampling_rate":   sr,
+        "t_fixed":         t_fixed,
+        "n_samples":       T,
+        "n_samples_ds":    signal_ds.shape[1],
+        "downsample":      ds,
+        "leads":           lead_names,
+        "signal":          signal_ds.tolist(),
+        "age":             float(meta["age"]) if not pd.isna(meta.get("age")) else 0.0,
+        "sex":             int(meta["sex"]) if not pd.isna(meta.get("sex")) else 0,
+        "sex_label":       "M" if (not pd.isna(meta.get("sex")) and int(meta["sex"]) == 0) else "F",
+        "severity_tier":   None,
+        "dx":              meta["_dx_list"],
+        "label_names":     [],
+        "tags":            sorted(meta["_tag_set"]),
+        "has_soft_seg_gt": soft_seg_payload is not None,
         "delineation": {
             "quality_ok": bool(delin.get("quality_ok", False)),
             "r_peaks":    _valid_int_list(delin.get("r_peaks", [])),
             "p_peaks":    _valid_int_list(d_map.get("ECG_P_Peaks", [])),
             "t_peaks":    _valid_int_list(d_map.get("ECG_T_Peaks", [])),
         },
-        "soft_seg":      soft_seg_payload,
+        "soft_seg":        soft_seg_payload,
     }
 
 
 @app.post("/infer")
 def infer(req: InferRequest):
+    ds_name = _normalize_dataset(req.dataset)
     resolved_id, model, cfg = get_model_and_cfg(req.model_id)
     sr      = int(cfg.get("data", {}).get("sampling_rate", 500))
     t_fixed = int(cfg.get("data", {}).get("t_fixed", 500))
@@ -678,7 +991,7 @@ def infer(req: InferRequest):
         _validate_compare_compatibility(cfg, cmp_cfg, cmp_id)
         cmp_bundle = (cmp_id, cmp_model, cmp_cfg)
 
-    signal = _load_filtered_signal(req.ecg_id, sr)
+    signal = _load_filtered_signal_any(req.ecg_id, sr, dataset=ds_name)
     C, T = signal.shape
     end = min(T, req.start + t_fixed)
     start = max(0, end - t_fixed)
@@ -694,7 +1007,7 @@ def infer(req: InferRequest):
         include_epistemic=req.include_epistemic,
     )
 
-    delin = _load_delineation(req.ecg_id, sr, lead_i)
+    delin = _load_delineation_any(req.ecg_id, sr, lead_i, dataset=ds_name)
     gt_concepts, gt_task = None, None
     if delin.get("quality_ok", False):
         c, w = get_concept_labels(start, start + t_fixed, delin["delineation"], delin["r_peaks"], delin.get("u_peaks"))
@@ -703,6 +1016,8 @@ def infer(req: InferRequest):
         gt_task = int(is_complete_heartbeat_window(c, w))
 
     payload = {
+        "ecg_id":         req.ecg_id,
+        "dataset":        ds_name,
         "model_id":       resolved_id,
         "model_type":     res["model_type"],
         "task_prob":      res["task_probs"][0],
@@ -739,6 +1054,7 @@ def infer(req: InferRequest):
 
 @app.post("/sweep")
 def sweep(req: SweepRequest):
+    ds_name = _normalize_dataset(req.dataset)
     resolved_id, model, cfg = get_model_and_cfg(req.model_id)
     sr      = int(cfg.get("data", {}).get("sampling_rate", 500))
     t_fixed = int(cfg.get("data", {}).get("t_fixed", 500))
@@ -751,7 +1067,7 @@ def sweep(req: SweepRequest):
         _validate_compare_compatibility(cfg, cmp_cfg, cmp_id)
         cmp_bundle = (cmp_id, cmp_model, cmp_cfg)
 
-    signal = _load_filtered_signal(req.ecg_id, sr)
+    signal = _load_filtered_signal_any(req.ecg_id, sr, dataset=ds_name)
     _, T   = signal.shape
     stride = max(5, req.stride)
     starts = list(range(0, T - t_fixed + 1, stride))
@@ -761,7 +1077,7 @@ def sweep(req: SweepRequest):
     windows = np.stack([signal[:, s : s + t_fixed] for s in starts], axis=0)
     res = _batch_infer_windows(model, cfg, windows)
 
-    delin = _load_delineation(req.ecg_id, sr, lead_i)
+    delin = _load_delineation_any(req.ecg_id, sr, lead_i, dataset=ds_name)
     gt_task, gt_concepts = None, None
     active = cfg.get("active_concepts", None)
     if delin.get("quality_ok", False):
@@ -775,6 +1091,7 @@ def sweep(req: SweepRequest):
 
     payload = {
         "ecg_id":        req.ecg_id,
+        "dataset":       ds_name,
         "model_id":      resolved_id,
         "model_type":    res["model_type"],
         "stride":        stride,
@@ -818,7 +1135,8 @@ def get_concepts(model_id: Optional[str] = None):
 
 
 class DenseInferRequest(BaseModel):
-    ecg_id: int
+    ecg_id: Union[int, str]
+    dataset: str = "ptbxl"
     model_id: Optional[str] = None
     compare_model_id: Optional[str] = None
     blackbox_model_id: Optional[str] = None
@@ -882,23 +1200,26 @@ def list_dense_models():
 
 @app.post("/dense-infer")
 def dense_infer(req: DenseInferRequest):
+    ds_name = _normalize_dataset(req.dataset)
     resolved_id, model, cfg = get_dense_model_and_cfg(req.model_id)
     sr = int(cfg.get("data", {}).get("sampling_rate", 100))
     c_mode = str(cfg.get("data", {}).get("concept_mode", "wave6"))
     c_names = list(cfg.get("concept_names", get_dense_concept_names(c_mode)))
 
-    sig = z_normalize(_load_filtered_signal(req.ecg_id, sr))
+    sig = z_normalize(_load_filtered_signal_any(req.ecg_id, sr, dataset=ds_name))
     T = sig.shape[-1]
     x = torch.from_numpy(sig).unsqueeze(0).to(DEVICE)
 
-    # Cache Zenodo GT soft-segmentation per requested dense concept mode
-    archive = _get_soft_seg_archive()
+    # Cache Zenodo GT soft-segmentation per requested dense concept mode (PTB-XL only)
+    archive = _get_soft_seg_archive() if ds_name == "ptbxl" else None
     raw_ss = None
-    if archive is not None and req.ecg_id in archive:
-        try:
-            raw_ss = archive.load(req.ecg_id)
-        except Exception as exc:
-            logger.warning(f"Could not load soft_seg GT for ecg_id={req.ecg_id}: {exc}")
+    if archive is not None:
+        eid_int = _parse_ptbxl_id(req.ecg_id)
+        if eid_int in archive:
+            try:
+                raw_ss = archive.load(eid_int)
+            except Exception as exc:
+                logger.warning(f"Could not load soft_seg GT for ecg_id={req.ecg_id}: {exc}")
 
     gt_by_mode: Dict[str, Optional[np.ndarray]] = {}
 
@@ -1002,6 +1323,17 @@ def dense_infer(req: DenseInferRequest):
                 tp = torch.sigmoid(out["task_logits"][0].float()).cpu().numpy()
                 tp_std = np.zeros(len(SUPERCLASS_NAMES), dtype=np.float32)
 
+        intervals = None
+        if m_mode == "wave6" and cp.shape[0] == 6:
+            iv = extract_wave_spans_and_intervals(cp.argmax(axis=0), fs=sr)
+            intervals = {
+                "qrs_ms":       _safe_round(iv.get("qrs_ms"), 1),
+                "pr_ms":        _safe_round(iv.get("pr_ms"), 1),
+                "qt_ms":        _safe_round(iv.get("qt_ms"), 1),
+                "pred_hr_bpm":  _safe_round(iv.get("pred_hr_bpm"), 1),
+                "canon_cycle":  _safe_round(iv.get("canonical_transition_rate"), 4),
+            }
+
         return {
             "has_seg":                True,
             "supports_interventions": m_can_int,
@@ -1009,6 +1341,7 @@ def dense_infer(req: DenseInferRequest):
             "concept_probs":          {name: np.round(cp[i], 3).tolist() for i, name in enumerate(m_c_names)},
             "concept_stds":           {name: np.round(cs[i], 3).tolist() for i, name in enumerate(m_c_names)},
             "mean_std_timeline":      np.round(cs.mean(axis=0), 4).tolist(),
+            "intervals":              intervals,
             "pathology":              {name: round(float(tp[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)},
             "base_pathology":         {name: round(float(base_tp[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)},
             "pathology_std":          {name: round(float(tp_std[i]), 4) for i, name in enumerate(SUPERCLASS_NAMES)},
@@ -1017,6 +1350,7 @@ def dense_infer(req: DenseInferRequest):
     prim = _run_one(model, cfg)
     payload = {
         "ecg_id":         req.ecg_id,
+        "dataset":        ds_name,
         "model_id":       resolved_id,
         "model_type":     getattr(model, "model_type", "dense_cem"),
         "sampling_rate":  sr,
@@ -1049,6 +1383,7 @@ def health():
         "device":        DEVICE,
         "runs_dir":      str(RUNS_DIR),
         "data_path":     str(DATA_PATH),
+        "datasets":      (["ptbxl", "georgia"] if _has_georgia() else ["ptbxl"]),
         "n_models":      len(runs),
         "default_model": DEFAULT_RUN_KEY,
     }

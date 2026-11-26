@@ -6,7 +6,354 @@
  *  - Test set benchmark table + Concept Intervention Curves (Uncertainty vs Random)
  * ────────────────────────────────────────────────────────────────────────── */
 
-const API = "";
+const URL_PARAMS = new URLSearchParams(window.location.search);
+const API = (URL_PARAMS.get("api") || window.EXPLORER_API_BASE || "").replace(/\/$/, "");
+const STATIC_MODE = Boolean(!URL_PARAMS.get("api") && window.EXPLORER_STATIC_MODE);
+
+let _staticManifestPromise = null;
+let _staticExtBenchPromise = null;
+const _staticRecordCache = new Map();
+
+function _sigmoid(x) {
+  const c = Math.max(-30, Math.min(30, x));
+  return 1.0 / (1.0 + Math.exp(-c));
+}
+
+async function _loadStaticManifest() {
+  if (!_staticManifestPromise) {
+    _staticManifestPromise = fetch("./data/manifest.json").then(r => {
+      if (!r.ok) throw new Error(`Static manifest HTTP ${r.status}`);
+      return r.json();
+    });
+  }
+  return _staticManifestPromise;
+}
+
+async function _loadStaticExternalBenchmark() {
+  if (!_staticExtBenchPromise) {
+    _staticExtBenchPromise = fetch("./data/external_benchmark.json")
+      .then(r => (r.ok ? r.json() : { available: false }))
+      .catch(() => ({ available: false }));
+  }
+  return _staticExtBenchPromise;
+}
+
+async function _loadStaticRecord(dataset, ecgId) {
+  const key = `${dataset}_${ecgId}`;
+  if (!_staticRecordCache.has(key)) {
+    const p = fetch(`./data/records/${encodeURIComponent(key)}.json`).then(r => {
+      if (!r.ok) throw new Error(`Static record ${key} HTTP ${r.status}`);
+      return r.json();
+    });
+    _staticRecordCache.set(key, p);
+  }
+  return _staticRecordCache.get(key);
+}
+
+function _nearestIdx(arr, target) {
+  let best = 0, bestDist = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const d = Math.abs(arr[i] - target);
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
+
+function _evalStaticWindowInfer(sw, head, ni, interventions) {
+  const cProbs = [...sw.concept_probs[ni]];
+  const cStds  = [...sw.concept_stds[ni]];
+  const hasInt = Boolean(interventions && Object.keys(interventions).length > 0);
+  if (!hasInt || !head || head.model_type === "blackbox") {
+    return {
+      task_prob:      sw.task_probs[ni],
+      task_std:       sw.task_stds[ni],
+      task_epistemic: 0.0,
+      task_aleatoric: sw.task_stds[ni],
+      concept_probs:  cProbs,
+      concept_stds:   cStds,
+    };
+  }
+  const inactive = new Set(head.inactive_concepts || []);
+  const K = cProbs.length;
+  let logit = head.bias || 0.0;
+
+  if (head.model_type === "cem") {
+    const aPos = sw.a_pos[ni];
+    const aNeg = sw.a_neg[ni];
+    for (let k = 0; k < K; k++) {
+      let pEff = cProbs[k];
+      if (inactive.has(k)) {
+        pEff = 0.0;
+      } else if (interventions[k] !== undefined || interventions[String(k)] !== undefined) {
+        const iv = interventions[k] !== undefined ? interventions[k] : interventions[String(k)];
+        pEff = Number(iv);
+        cProbs[k] = pEff;
+        cStds[k] = 0.0;
+      }
+      logit += pEff * aPos[k] + (1.0 - pEff) * aNeg[k];
+    }
+  } else {
+    const wProb = head.w_prob || [];
+    const wVar  = head.w_var || [];
+    const cVars = sw.c_vars ? sw.c_vars[ni] : new Array(K).fill(0.0);
+    const vZero = Math.exp(-20.0);
+    for (let k = 0; k < K; k++) {
+      let pEff = cProbs[k];
+      let vEff = cVars[k] || 0.0;
+      if (inactive.has(k)) {
+        pEff = 0.0;
+        vEff = 0.0;
+      } else if (interventions[k] !== undefined || interventions[String(k)] !== undefined) {
+        const iv = interventions[k] !== undefined ? interventions[k] : interventions[String(k)];
+        pEff = Number(iv);
+        vEff = vZero;
+        cProbs[k] = pEff;
+        cStds[k] = 0.0;
+      }
+      logit += (wProb[k] || 0.0) * pEff + (head.use_uncertainty ? (wVar[k] || 0.0) * vEff : 0.0);
+    }
+  }
+
+  return {
+    task_prob:      _sigmoid(logit),
+    task_std:       0.0,
+    task_epistemic: 0.0,
+    task_aleatoric: 0.0,
+    concept_probs:  cProbs,
+    concept_stds:   cStds,
+  };
+}
+
+function _buildStaticDenseEntry(rec, modelId, includeEpistemic, intMode, intConcepts) {
+  const de = rec.dense?.[modelId];
+  if (!de) return null;
+  if (!de.has_seg) {
+    return {
+      model_id:               modelId,
+      model_type:             de.model_type,
+      has_seg:                false,
+      supports_interventions: false,
+      concept_names:          de.concept_names,
+      concept_probs:          null,
+      concept_stds:           null,
+      mean_std_timeline:      null,
+      intervals:              null,
+      pathology:              de.base_pathology,
+      base_pathology:         de.base_pathology,
+      pathology_std:          (includeEpistemic && de.pathology_std_mc) ? de.pathology_std_mc : de.pathology_std,
+    };
+  }
+
+  const cNames = de.concept_names || ["P", "PQ", "QRS", "ST", "T", "TP"];
+  let cpOut = {};
+  cNames.forEach(n => { cpOut[n] = [...de.concept_probs[n]]; });
+  let csOut = de.concept_stds ? {} : null;
+  if (csOut) cNames.forEach(n => { csOut[n] = [...de.concept_stds[n]]; });
+  let stdLine = [...((includeEpistemic && de.mean_std_timeline_mc) ? de.mean_std_timeline_mc : de.mean_std_timeline)];
+  let patho = { ...de.base_pathology };
+
+  const mode = (intMode || "").toLowerCase();
+  if (de.supports_interventions && mode) {
+    if (mode === "gt" && rec.dense_gt_probs && de.interventions?.gt) {
+      patho = { ...de.interventions.gt };
+      cpOut = {};
+      cNames.forEach(n => { cpOut[n] = [...rec.dense_gt_probs[n]]; });
+      if (csOut) cNames.forEach(n => { csOut[n] = csOut[n].map(() => 0); });
+      stdLine = stdLine.map(() => 0);
+    } else if ((mode === "ablate" || mode === "force") && intConcepts?.length) {
+      const target = intConcepts[0];
+      const ikey = `${mode}:${target}`;
+      if (de.interventions?.[ikey]) patho = { ...de.interventions[ikey] };
+      const T = cpOut[cNames[0]]?.length || 0;
+      if (mode === "ablate" && cpOut[target]) {
+        for (let t = 0; t < T; t++) {
+          cpOut[target][t] = 0.0;
+          let sum = 0.0;
+          cNames.forEach(n => { sum += cpOut[n][t]; });
+          const denom = Math.max(1e-6, sum);
+          cNames.forEach(n => { cpOut[n][t] = Number((cpOut[n][t] / denom).toFixed(3)); });
+          if (csOut?.[target]) csOut[target][t] = 0.0;
+        }
+      } else if (mode === "force" && cpOut[target]) {
+        for (let t = 0; t < T; t++) {
+          cNames.forEach(n => { cpOut[n][t] = n === target ? 1.0 : 0.0; });
+          if (csOut) cNames.forEach(n => { csOut[n][t] = 0.0; });
+          stdLine[t] = 0.0;
+        }
+      }
+    }
+  }
+
+  return {
+    model_id:               modelId,
+    model_type:             de.model_type,
+    has_seg:                true,
+    supports_interventions: Boolean(de.supports_interventions),
+    concept_names:          cNames,
+    concept_probs:          cpOut,
+    concept_stds:           csOut,
+    mean_std_timeline:      stdLine,
+    intervals:              de.intervals || null,
+    pathology:              patho,
+    base_pathology:         de.base_pathology,
+    pathology_std:          (includeEpistemic && de.pathology_std_mc) ? de.pathology_std_mc : de.pathology_std,
+  };
+}
+
+async function apiGet(path) {
+  if (!STATIC_MODE) {
+    const res = await fetch(`${API}${path}`);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+  const u = new URL(path, "http://local");
+  const p = u.pathname;
+  const manifest = await _loadStaticManifest();
+  if (p === "/health") {
+    return {
+      status:   "ok",
+      device:   "STATIC CDN",
+      datasets: (manifest.datasets || []).map(d => d.id),
+      n_models: (manifest.models?.models || []).length,
+    };
+  }
+  if (p === "/datasets") {
+    return { default_dataset: manifest.default_dataset || "ptbxl", datasets: manifest.datasets || [] };
+  }
+  if (p === "/external-benchmark") {
+    return _loadStaticExternalBenchmark();
+  }
+  if (p === "/models") return manifest.models;
+  if (p === "/dense-models") return manifest.dense_models;
+  if (p.startsWith("/model/") && p.endsWith("/summary")) {
+    const mid = decodeURIComponent(p.slice(7, -8));
+    return manifest.summaries[mid] || null;
+  }
+  if (p === "/records") {
+    const ds = u.searchParams.get("dataset") || "ptbxl";
+    const fold = u.searchParams.get("fold");
+    const dx = (u.searchParams.get("dx") || "ALL").toUpperCase();
+    const search = (u.searchParams.get("search") || "").trim().toLowerCase();
+    let list = manifest.records_by_dataset[ds] || [];
+    if (fold && fold !== "all") {
+      list = list.filter(r => String(ds === "georgia" ? r.severity_tier : r.fold) === String(fold));
+    }
+    if (dx && dx !== "ALL") {
+      list = list.filter(r => (r.tags || []).includes(dx));
+    }
+    if (search) {
+      list = list.filter(r =>
+        String(r.ecg_id).toLowerCase().includes(search) ||
+        (r.label_names || []).join(" ").toLowerCase().includes(search) ||
+        (r.dx || []).join(" ").toLowerCase().includes(search)
+      );
+    }
+    return { dataset: ds, record_ids: list.map(r => r.ecg_id), records: list, total: list.length };
+  }
+  if (p.startsWith("/record/")) {
+    const ecgId = decodeURIComponent(p.slice(8));
+    const ds = u.searchParams.get("dataset") || "ptbxl";
+    const rec = await _loadStaticRecord(ds, ecgId);
+    return rec.record;
+  }
+  throw new Error(`Unsupported static GET route: ${path}`);
+}
+
+async function apiPost(path, body) {
+  if (!STATIC_MODE) {
+    const res = await fetch(`${API}${path}`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+  const manifest = await _loadStaticManifest();
+  const ds = body.dataset || "ptbxl";
+  const rec = await _loadStaticRecord(ds, body.ecg_id);
+
+  if (path === "/sweep") {
+    const mid = body.model_id || manifest.models.default_model;
+    const sw = rec.sweeps[mid];
+    const cid = body.compare_model_id;
+    const csw = (cid && rec.sweeps[cid]) ? rec.sweeps[cid] : null;
+    return {
+      ecg_id:        body.ecg_id,
+      dataset:       ds,
+      model_id:      mid,
+      model_type:    sw.model_type,
+      stride:        sw.stride,
+      t_fixed:       sw.t_fixed,
+      sampling_rate: sw.sampling_rate,
+      starts:        sw.starts,
+      task_probs:    sw.task_probs,
+      task_stds:     sw.task_stds,
+      concept_probs: sw.concept_probs,
+      concept_stds:  sw.concept_stds,
+      concept_names: sw.concept_names,
+      gt_task:       rec.sweep_gt_task,
+      gt_concepts:   rec.sweep_gt_concepts,
+      compare: csw ? {
+        model_id:      cid,
+        model_type:    csw.model_type,
+        task_probs:    csw.task_probs,
+        task_stds:     csw.task_stds,
+        concept_probs: csw.concept_probs,
+        concept_stds:  csw.concept_stds,
+      } : null,
+    };
+  }
+  if (path === "/infer") {
+    const mid = body.model_id || manifest.models.default_model;
+    const sw = rec.sweeps[mid];
+    const head = manifest.window_heads[mid];
+    const ni = _nearestIdx(sw.starts, body.start);
+    const prim = _evalStaticWindowInfer(sw, head, ni, body.interventions);
+    const out = {
+      ecg_id:        body.ecg_id,
+      dataset:       ds,
+      model_id:      mid,
+      model_type:    sw.model_type,
+      ...prim,
+      concept_names: sw.concept_names,
+      gt_concepts:   rec.sweep_gt_concepts ? rec.sweep_gt_concepts[ni] : null,
+      gt_task:       rec.sweep_gt_task ? rec.sweep_gt_task[ni] : null,
+    };
+    const cid = body.compare_model_id;
+    if (cid && rec.sweeps[cid]) {
+      const csw = rec.sweeps[cid];
+      out.compare = {
+        model_id:   cid,
+        model_type: csw.model_type,
+        ..._evalStaticWindowInfer(csw, manifest.window_heads[cid], ni, body.interventions),
+      };
+    }
+    return out;
+  }
+  if (path === "/dense-infer") {
+    const mid = body.model_id || manifest.dense_models.default_model;
+    const prim = _buildStaticDenseEntry(rec, mid, body.include_epistemic, body.intervene_mode, body.intervene_concepts);
+    const out = {
+      ecg_id:         body.ecg_id,
+      dataset:        ds,
+      sampling_rate:  100,
+      gt_probs:       rec.dense_gt_probs || null,
+      intervene_mode: body.intervene_mode || null,
+      ...prim,
+    };
+    if (body.compare_model_id) {
+      const cmp = _buildStaticDenseEntry(rec, body.compare_model_id, body.include_epistemic, body.intervene_mode, body.intervene_concepts);
+      if (cmp) out.compare = cmp;
+    }
+    if (body.blackbox_model_id) {
+      const bb = _buildStaticDenseEntry(rec, body.blackbox_model_id, body.include_epistemic, null, null);
+      if (bb) out.blackbox = bb;
+    }
+    return out;
+  }
+  throw new Error(`Unsupported static POST route: ${path}`);
+}
 const FALLBACK_PALETTE = [
   "#2b5b84", "#7c5295", "#b83b2a", "#c87137", "#2d7a56",
   "#a68a2c", "#2a7f8e", "#4b5599", "#9e4268", "#2d7a56",
@@ -23,6 +370,10 @@ function conceptColor(name, idx) {
 
 const state = {
   models:         [],
+  datasets:       [],
+  dataset:        "ptbxl",
+  hasSoftSegGt:   true,
+  externalBenchmark: null,
   primaryModel:   null,
   compareModel:   "",
   primarySummary: null,
@@ -82,13 +433,40 @@ function stopPlayback() {
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const h = await (await fetch(`${API}/health`)).json();
+    const [h, dsData, extData] = await Promise.all([
+      apiGet("/health"),
+      apiGet("/datasets"),
+      apiGet("/external-benchmark").catch(() => ({ available: false })),
+    ]);
+    state.datasets = dsData.datasets || [];
+    state.dataset = dsData.default_dataset || "ptbxl";
+    populateDatasetSelect();
+    if (extData?.available) state.externalBenchmark = extData;
+    const nDs = (h.datasets || state.datasets || []).length;
+    const devLbl = STATIC_MODE ? "STATIC CDN" : String(h.device || "CPU").toUpperCase();
     document.getElementById("device-badge").textContent =
-      `${h.device.toUpperCase()} · ${h.n_models} models`;
+      `${devLbl} · ${h.n_models} models${nDs > 1 ? ` · ${nDs} datasets` : ""}`;
   } catch (_) {}
+
+  if (STATIC_MODE) {
+    const strideInp = document.getElementById("stride-input");
+    if (strideInp) {
+      strideInp.value = "25";
+      strideInp.disabled = true;
+      strideInp.title = "Precomputed stride (25 samples = 50 ms) in static Vercel mode; append ?api=https://... for custom strides";
+    }
+    const scopeSel = document.getElementById("dense-int-scope");
+    if (scopeSel) {
+      const wOpt = scopeSel.querySelector('option[value="window"]');
+      if (wOpt) wOpt.disabled = true;
+      scopeSel.value = "record";
+      scopeSel.title = "Window-scoped dense intervention requires a live FastAPI backend (?api=...); full 10s record interventions are exact & precomputed";
+    }
+  }
 
   await loadModels();
   await loadDenseModels();
+  applyDatasetControls(false);
   await loadRecordList();
   await refreshBenchmarks();
 
@@ -99,9 +477,111 @@ async function init() {
   }
 }
 
+const CONDITION_LABELS = {
+  ALL: "All",
+  BBB: "BBB (LBBB/RBBB)",
+  IAVB: "IAVB (1st AV Block)",
+  LQT: "LQT (Prolonged QT)",
+  PVC: "PVC / PAC",
+};
+
+function currentDatasetMeta() {
+  return (state.datasets || []).find(d => d.id === state.dataset) || {
+    id: "ptbxl",
+    split_label: "Split",
+    has_soft_seg_gt: true,
+    default_record: "9",
+    default_split: "10",
+    splits: [
+      { value: "10", label: "Test (Fold 10)" },
+      { value: "9", label: "Val (Fold 9)" },
+      { value: "all", label: "All Folds" },
+    ],
+    conditions: ["ALL", "NORM", "MI", "STTC", "CD", "HYP", "AFIB", "BBB", "PVC"],
+  };
+}
+
+function populateDatasetSelect() {
+  const dsSel = document.getElementById("dataset-select");
+  if (!dsSel || !state.datasets.length) return;
+  dsSel.innerHTML = "";
+  state.datasets.forEach(d => {
+    dsSel.appendChild(new Option(d.label, d.id, false, d.id === state.dataset));
+  });
+}
+
+function applyDatasetControls(switchLead = true) {
+  const meta = currentDatasetMeta();
+  state.hasSoftSegGt = Boolean(meta.has_soft_seg_gt);
+
+  const foldLabel = document.getElementById("fold-label");
+  if (foldLabel) foldLabel.textContent = meta.split_label || "Split";
+
+  const foldSel = document.getElementById("fold-select");
+  if (foldSel) {
+    foldSel.innerHTML = "";
+    (meta.splits || []).forEach(sp => {
+      foldSel.appendChild(new Option(sp.label, sp.value, false, sp.value === meta.default_split));
+    });
+  }
+
+  const dxSel = document.getElementById("dx-select");
+  if (dxSel) {
+    dxSel.innerHTML = "";
+    (meta.conditions || ["ALL"]).forEach(c => {
+      dxSel.appendChild(new Option(CONDITION_LABELS[c] || c, c, false, c === "ALL"));
+    });
+  }
+
+  const searchInp = document.getElementById("record-search");
+  if (searchInp) searchInp.value = "";
+
+  // Toggle Zenodo GT options cleanly when viewing Georgia OOD
+  const overlaySel = document.getElementById("ecg-seg-overlay");
+  if (overlaySel) {
+    const zenOpt = overlaySel.querySelector('option[value="zenodo"]');
+    if (zenOpt) zenOpt.disabled = !state.hasSoftSegGt;
+    if (!state.hasSoftSegGt && overlaySel.value === "zenodo") {
+      overlaySel.value = "dense_cem";
+      state.ecgSegOverlay = "dense_cem";
+    }
+  }
+
+  const cmpModeSel = document.getElementById("seg-compare-mode");
+  if (cmpModeSel) {
+    ["cem_vs_gt", "cbm_vs_gt", "gt_only"].forEach(v => {
+      const opt = cmpModeSel.querySelector(`option[value="${v}"]`);
+      if (opt) opt.disabled = !state.hasSoftSegGt;
+    });
+    if (!state.hasSoftSegGt && ["cem_vs_gt", "cbm_vs_gt", "gt_only"].includes(cmpModeSel.value)) {
+      cmpModeSel.value = "cem_vs_cbm";
+    }
+  }
+
+  const gtBtn = document.getElementById("dense-gt-int-btn");
+  if (gtBtn) {
+    gtBtn.disabled = !state.hasSoftSegGt;
+    gtBtn.style.opacity = state.hasSoftSegGt ? "1" : "0.45";
+    gtBtn.title = state.hasSoftSegGt
+      ? "Substitute Zenodo GT soft masks into Dense CBM & Dense CEM"
+      : "Zenodo 7610236 GT masks are only available on PTB-XL";
+  }
+
+  if (switchLead) {
+    const leadSel = document.getElementById("lead-select");
+    if (leadSel) {
+      const targetLead = state.dataset === "georgia" ? 1 : 0;
+      leadSel.value = String(targetLead);
+      state.leadIdx = targetLead;
+    }
+  }
+
+  renderDenseMetricsTable();
+  renderMetricsTable();
+}
+
 async function loadModels() {
-  const res = await fetch(`${API}/models`);
-  const data = await res.json();
+  const data = await apiGet("/models");
   state.models = data.models || [];
   state.primaryModel = data.default_model || (state.models[0] ? state.models[0].id : "");
   state.compareModel = data.compare_default || "";
@@ -124,29 +604,39 @@ async function loadRecordList() {
   const foldVal = document.getElementById("fold-select").value;
   const dxVal   = document.getElementById("dx-select").value;
   const search  = document.getElementById("record-search").value.trim();
-  const params  = new URLSearchParams({ limit: "300" });
+  const params  = new URLSearchParams({ limit: "300", dataset: state.dataset });
   if (foldVal !== "all") params.set("fold", foldVal);
   if (dxVal && dxVal !== "ALL") params.set("dx", dxVal);
   if (search) params.set("search", search);
 
-  const res  = await fetch(`${API}/records?${params.toString()}`);
-  const data = await res.json();
+  const data = await apiGet(`/records?${params.toString()}`);
   const sel  = document.getElementById("record-select");
   sel.innerHTML = "";
   (data.records || []).forEach(r => {
-    const tags = r.tags && r.tags.length ? ` [${r.tags.join(",")}]` : "";
-    sel.appendChild(new Option(`Record #${r.ecg_id}${tags}`, String(r.ecg_id)));
+    let text;
+    if (state.dataset === "georgia") {
+      const lbls = (r.label_names && r.label_names.length) ? r.label_names : (r.tags || []);
+      const tagStr = lbls.length ? ` [${lbls.join(", ")}]` : ` [${r.severity_tier || ""}]`;
+      text = `${r.ecg_id}${tagStr}`;
+    } else {
+      const tags = r.tags && r.tags.length ? ` [${r.tags.join(",")}]` : "";
+      text = `Record #${r.ecg_id}${tags}`;
+    }
+    sel.appendChild(new Option(text, String(r.ecg_id)));
   });
-  if (!search && dxVal === "ALL" && [...sel.options].some(o => o.value === "9")) {
-    sel.value = "9";
+  const defId = String(currentDatasetMeta().default_record || "");
+  if (!search && dxVal === "ALL" && defId && [...sel.options].some(o => o.value === defId)) {
+    sel.value = defId;
   }
 }
 
 // ── Record loading & automatic sweep ───────────────────────────────────────
 async function loadCurrentRecord() {
   stopPlayback();
-  const ecgId = parseInt(document.getElementById("record-select").value, 10);
-  if (isNaN(ecgId)) return;
+  const rawVal = (document.getElementById("record-select").value || "").trim();
+  if (!rawVal) return;
+  const ecgId = state.dataset === "ptbxl" ? parseInt(rawVal, 10) : rawVal;
+  if (state.dataset === "ptbxl" && isNaN(ecgId)) return;
 
   state.ecgId         = ecgId;
   state.leadIdx       = parseInt(document.getElementById("lead-select").value, 10) || 0;
@@ -161,12 +651,15 @@ async function loadCurrentRecord() {
   document.getElementById("signal-hint").style.display = "none";
   document.getElementById("pipeline-section").style.display = "";
 
-  const res = await fetch(`${API}/record/${ecgId}?model_id=${encodeURIComponent(state.primaryModel || "")}`);
-  if (!res.ok) {
-    alert(`Failed to load record: ${await res.text()}`);
+  let data;
+  try {
+    data = await apiGet(
+      `/record/${encodeURIComponent(ecgId)}?model_id=${encodeURIComponent(state.primaryModel || "")}&dataset=${encodeURIComponent(state.dataset)}`
+    );
+  } catch (err) {
+    alert(`Failed to load record: ${err.message}`);
     return;
   }
-  const data = await res.json();
   state.signal       = data.signal;
   state.delineation  = data.delineation;
   state.softSeg      = data.soft_seg || null;
@@ -185,10 +678,19 @@ async function loadCurrentRecord() {
   }
 
   const age = data.age > 0 ? `age ${Math.round(data.age)}` : "";
-  const sex = data.sex === 0 ? "M" : "F";
-  const dx  = data.dx && data.dx.length ? `· ${data.dx.join(", ")}` : "";
-  document.getElementById("record-meta").textContent =
-    `— Record #${ecgId}  ${age} ${sex} ${dx}  (${rps.length} R-peaks)`;
+  if (data.dataset === "georgia") {
+    const sexTag = data.sex_label || "";
+    const dxArr = (data.label_names && data.label_names.length) ? data.label_names : (data.dx || []);
+    const dxStr = dxArr.length ? `· ${dxArr.join(", ")}` : "";
+    const hrStr = data.est_hr_bpm ? ` · ${data.est_hr_bpm} bpm` : "";
+    document.getElementById("record-meta").textContent =
+      `— Georgia ${ecgId} (${data.severity_tier})  ${age} ${sexTag} ${dxStr}${hrStr}  (${rps.length} R-peaks)`;
+  } else {
+    const sex = data.sex === 0 ? "M" : "F";
+    const dx  = data.dx && data.dx.length ? `· ${data.dx.join(", ")}` : "";
+    document.getElementById("record-meta").textContent =
+      `— Record #${ecgId}  ${age} ${sex} ${dx}  (${rps.length} R-peaks)`;
+  }
 
   renderSignal();
   await Promise.all([runSweep(), runDenseInfer()]);
@@ -359,18 +861,13 @@ async function runSweep() {
   status.className   = "status-label running";
 
   try {
-    const res = await fetch(`${API}/sweep`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ecg_id:           state.ecgId,
-        stride,
-        model_id:         state.primaryModel,
-        compare_model_id: state.compareModel || null,
-      }),
+    state.sweepData = await apiPost("/sweep", {
+      ecg_id:           state.ecgId,
+      dataset:          state.dataset,
+      stride,
+      model_id:         state.primaryModel,
+      compare_model_id: state.compareModel || null,
     });
-    if (!res.ok) throw new Error(await res.text());
-    state.sweepData = await res.json();
   } catch (e) {
     status.textContent = `Sweep error: ${e.message}`;
     status.className   = "status-label";
@@ -420,8 +917,7 @@ function renderTimelineView() {
 
 async function loadDenseModels() {
   try {
-    const res = await fetch(`${API}/dense-models`);
-    state.denseModels = res.ok ? await res.json() : { models: [] };
+    state.denseModels = await apiGet("/dense-models");
   } catch (_) {
     state.denseModels = { models: [] };
   }
@@ -470,6 +966,7 @@ async function runDenseInfer() {
   }
   const body = {
     ecg_id:            state.ecgId,
+    dataset:           state.dataset,
     model_id:          modelId,
     compare_model_id:  state.denseCompare  || null,
     blackbox_model_id: state.denseBlackbox || null,
@@ -479,13 +976,7 @@ async function runDenseInfer() {
     intervene_span:    span,
   };
   try {
-    const res = await fetch(`${API}/dense-infer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    state.denseData = await res.json();
+    state.denseData = await apiPost("/dense-infer", body);
     const st = document.getElementById("dense-seg-status");
     const intTag = state.denseIntMode
       ? ` · Intervention: ${state.denseIntMode.toUpperCase()}${state.denseIntConcept ? " " + state.denseIntConcept : ""} (${scope})`
@@ -493,7 +984,14 @@ async function runDenseInfer() {
     const ids = [state.denseData.model_id];
     if (state.denseData.compare)  ids.push(state.denseData.compare.model_id);
     if (state.denseData.blackbox) ids.push(state.denseData.blackbox.model_id);
-    st.textContent = `— ${ids.join(" vs. ")}${intTag}`;
+    const iv = state.denseData.intervals || state.denseData.compare?.intervals;
+    const ivParts = [];
+    if (iv?.qrs_ms !== null && iv?.qrs_ms !== undefined) ivParts.push(`QRS ${iv.qrs_ms}ms`);
+    if (iv?.pr_ms  !== null && iv?.pr_ms  !== undefined) ivParts.push(`PR ${iv.pr_ms}ms`);
+    if (iv?.qt_ms  !== null && iv?.qt_ms  !== undefined) ivParts.push(`QT ${iv.qt_ms}ms`);
+    if (iv?.pred_hr_bpm !== null && iv?.pred_hr_bpm !== undefined) ivParts.push(`HR ${iv.pred_hr_bpm}bpm`);
+    const ivTag = ivParts.length ? ` · ${ivParts.join(" · ")}` : "";
+    st.textContent = `— ${ids.join(" vs. ")}${ivTag}${intTag}`;
 
     renderDensePathologyBars();
     renderDenseWavePills();
@@ -625,8 +1123,20 @@ function renderDensePathologyBars() {
   }
 }
 
+function _resolveGeorgiaDenseId(modelId, s1Models) {
+  if (!s1Models) return { key: null, mapped: false };
+  if (s1Models[modelId]) return { key: modelId, mapped: false };
+  if (modelId.startsWith("dense_cbm_detached")) return { key: "dense_cbm_detached_s42", mapped: true };
+  if (modelId.startsWith("dense_cbm_joint") || modelId === "dense_cbm_softseg") return { key: "dense_cbm_joint_s42", mapped: true };
+  if (modelId.startsWith("dense_cem")) return { key: "dense_cem_s42", mapped: true };
+  if (modelId.startsWith("dense_multitask")) return { key: "dense_multitask_s42", mapped: true };
+  if (modelId.startsWith("dense_blackbox")) return { key: "dense_blackbox_s42", mapped: true };
+  return { key: null, mapped: false };
+}
+
 function renderDenseMetricsTable() {
   const el = document.getElementById("dense-metrics-table");
+  const titleEl = document.getElementById("dense-benchmark-title");
   const allModels = state.denseModels?.models || [];
   if (!el || !allModels.length) return;
 
@@ -642,6 +1152,65 @@ function renderDenseMetricsTable() {
     if (m && !shown.some(x => x.id === m.id)) shown.push(m);
   });
   if (!shown.length) return;
+
+  // External Zero-Shot Georgia 12-Lead Benchmark view
+  const ext = state.externalBenchmark;
+  if (state.dataset === "georgia" && ext?.suite1_full_clean_cohort?.models) {
+    if (titleEl) titleEl.textContent = "Zero-Shot External Benchmark · Georgia 12-Lead (8,770 Clean ECGs)";
+    const s1 = ext.suite1_full_clean_cohort.models;
+    const s2 = ext.suite2_neurokit2_delineation?.models || {};
+    const s3 = ext.suite3_uncertainty_and_noise?.models || {};
+    const resolved = shown.map(m => ({ m, ..._resolveGeorgiaDenseId(m.id, s1) }));
+
+    const extRows = [
+      { label: "NK2 QRS / P / T F1 (±150 ms)", combo: true, higher: true },
+      { label: "QRS Peak MAE ↓ (ms)",           get: k => s2[k]?.georgia?.QRS?.tol_150ms?.mae_ms,               higher: false, fmt: v => v.toFixed(1) + " ms" },
+      { label: "HR MAE vs. Ref ↓ (bpm)",        get: k => s1[k]?.segmentation?.hr_agreement?.mae_bpm,          higher: false, fmt: v => v.toFixed(2) },
+      { label: "Canonical Cycle Order ↑",       get: k => s1[k]?.segmentation?.canonical_transition_rate,     higher: true,  fmt: v => (v * 100).toFixed(2) + "%" },
+      { label: "Boundary / Interior σ ↑",       get: k => s3[k]?.georgia_clean_bnd_vs_int,                    higher: true,  fmt: v => v.toFixed(2) + "×" },
+      { label: "LBBB QRS Widening AUROC",       get: k => s1[k]?.segmentation?.clinical_morphology?.lbbb_vs_nsr_qrs_ms?.auroc, higher: true, fmt: v => v.toFixed(3) },
+      { label: "IAVB PR Prolongation AUROC",    get: k => s1[k]?.segmentation?.clinical_morphology?.iavb_vs_nsr_pr_ms?.auroc,  higher: true, fmt: v => v.toFixed(3) },
+      { label: "4-Class Pathology AUROC",       get: k => s1[k]?.pathology?.macro_auroc_4_ex_mi,              higher: true,  fmt: v => v.toFixed(4) },
+    ];
+
+    let html = `<table class="metrics-table"><thead><tr><th>Zero-Shot Metric (Georgia)</th>`;
+    resolved.forEach(({ m, key, mapped }) => {
+      const tag = m.model_type.replace(/^dense_/, "").toUpperCase();
+      const note = mapped && key ? ` · ref ${key}` : "";
+      html += `<th>${m.id}<br/><span class="meta-label">[${tag}${note}]</span></th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    extRows.forEach(r => {
+      if (r.combo) {
+        const fmtC = k => {
+          const g = k ? s2[k]?.georgia : null;
+          if (!g) return "—";
+          return `${g.QRS.tol_150ms.f1.toFixed(3)} / ${g.P.tol_150ms.f1.toFixed(3)} / ${g.T.tol_150ms.f1.toFixed(3)}`;
+        };
+        html += `<tr><td>${r.label}</td>${resolved.map(({ key }) => `<td>${fmtC(key)}</td>`).join("")}</tr>`;
+        return;
+      }
+      const vals = resolved.map(({ key }) => {
+        const v = key ? r.get(key) : undefined;
+        return (typeof v === "number" && !Number.isNaN(v)) ? v : undefined;
+      });
+      if (vals.every(v => v === undefined)) return;
+      const valid = vals.filter(v => v !== undefined);
+      const bestVal = valid.length > 1 ? valid.reduce((a, b) => (r.higher ? (b > a ? b : a) : (b < a ? b : a))) : null;
+      html += `<tr><td>${r.label}</td>`;
+      vals.forEach(v => {
+        const isBest = v !== undefined && bestVal !== null && v === bestVal;
+        html += `<td class="${isBest ? "best" : ""}">${v !== undefined ? r.fmt(v) : "—"}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+    el.innerHTML = html;
+    return;
+  }
+
+  if (titleEl) titleEl.textContent = "Per-Timestamp Test Benchmark · Fold 10 (2.20M Timestamps)";
 
   const rows = [
     { label: "Per-Timestamp Acc",         key: "seg/argmax_acc",                         higher: true,  fmt: v => (v * 100).toFixed(2) + "%" },
@@ -1091,20 +1660,15 @@ async function updatePipeline() {
   }
 
   try {
-    const res = await fetch(`${API}/infer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ecg_id:            state.ecgId,
-        start:             state.windowStart,
-        model_id:          state.primaryModel,
-        compare_model_id:  state.compareModel || null,
-        interventions:     hasInt ? state.interventions : null,
-        include_epistemic: wantEpistemic,
-      }),
+    const result = await apiPost("/infer", {
+      ecg_id:            state.ecgId,
+      dataset:           state.dataset,
+      start:             state.windowStart,
+      model_id:          state.primaryModel,
+      compare_model_id:  state.compareModel || null,
+      interventions:     hasInt ? state.interventions : null,
+      include_epistemic: wantEpistemic,
     });
-    if (!res.ok) throw new Error(await res.text());
-    const result = await res.json();
     if (result.concept_names) state.conceptNames = result.concept_names;
     renderPipelineValues(result);
   } catch (e) {
@@ -1361,12 +1925,12 @@ function renderTaskPrediction(modelId, taskProb, taskStd, cmpObj) {
 async function refreshBenchmarks() {
   if (!state.primaryModel) return;
   try {
-    state.primarySummary = await (await fetch(`${API}/model/${encodeURIComponent(state.primaryModel)}/summary`)).json();
+    state.primarySummary = await apiGet(`/model/${encodeURIComponent(state.primaryModel)}/summary`);
   } catch (_) { state.primarySummary = null; }
 
   if (state.compareModel) {
     try {
-      state.compareSummary = await (await fetch(`${API}/model/${encodeURIComponent(state.compareModel)}/summary`)).json();
+      state.compareSummary = await apiGet(`/model/${encodeURIComponent(state.compareModel)}/summary`);
     } catch (_) { state.compareSummary = null; }
   } else {
     state.compareSummary = null;
@@ -1399,6 +1963,14 @@ function renderMetricsTable() {
   ];
 
   const hasCmp = Boolean(c && c.metrics);
+  const s4 = (state.dataset === "georgia") ? state.externalBenchmark?.suite4_window_500hz_zeroshot : null;
+  const subEl = document.getElementById("benchmark-subtitle");
+  if (subEl) {
+    subEl.textContent = s4
+      ? `PTB-XL Fold 10 + Georgia 500 Hz Zero-Shot (${s4.n_windows} windows)`
+      : "PTB-XL Fold 10";
+  }
+
   let html = `<table class="metrics-table"><thead><tr><th>Metric (Test Fold 10)</th><th>${p.id} (${p.model_type.toUpperCase()})</th>`;
   if (hasCmp) html += `<th>${c.id} (${c.model_type.toUpperCase()})</th>`;
   html += `</tr></thead><tbody>`;
@@ -1416,6 +1988,28 @@ function renderMetricsTable() {
     if (hasCmp) html += `<td class="${cCls}">${vc !== undefined ? r.fmt(vc) : "—"}</td>`;
     html += `</tr>`;
   });
+
+  if (s4?.models && (s4.models[p.id] || (hasCmp && s4.models[c.id]))) {
+    const gaRows = [
+      { label: "Georgia 500 Hz Task Acc",      key: "task_accuracy",           fmt: v => (v * 100).toFixed(2) + "%" },
+      { label: "Georgia 500 Hz Task AUROC",    key: "task_auroc",              fmt: v => v.toFixed(4) },
+      { label: "Georgia Concept Macro-F1",     key: "shared_concept_macro_f1", fmt: v => v.toFixed(4) },
+    ];
+    gaRows.forEach(gr => {
+      const vp = s4.models[p.id]?.[gr.key];
+      const vc = hasCmp ? s4.models[c.id]?.[gr.key] : undefined;
+      if (vp === undefined && vc === undefined) return;
+      let pCls = "", cCls = "";
+      if (vp !== undefined && vc !== undefined) {
+        if (vp > vc) pCls = "best";
+        else if (vc > vp) cCls = "best";
+      }
+      html += `<tr><td>${gr.label}</td><td class="${pCls}">${vp !== undefined ? gr.fmt(vp) : "—"}</td>`;
+      if (hasCmp) html += `<td class="${cCls}">${vc !== undefined ? gr.fmt(vc) : "—"}</td>`;
+      html += `</tr>`;
+    });
+  }
+
   html += `</tbody></table>`;
   el.innerHTML = html;
 }
@@ -1527,6 +2121,17 @@ document.getElementById("sweep-btn").addEventListener("click", runSweep);
 document.getElementById("lead-select").addEventListener("change", () => {
   state.leadIdx = parseInt(document.getElementById("lead-select").value, 10) || 0;
   if (state.signal) { renderSignal(); renderWindowPlot(); }
+});
+
+document.getElementById("dataset-select")?.addEventListener("change", async e => {
+  state.dataset = e.target.value || "ptbxl";
+  applyDatasetControls(true);
+  renderMetricsTable();
+  await loadRecordList();
+  const recSel = document.getElementById("record-select");
+  if (recSel && recSel.options.length > 0 && recSel.value) {
+    await loadCurrentRecord();
+  }
 });
 
 document.getElementById("fold-select").addEventListener("change", loadRecordList);

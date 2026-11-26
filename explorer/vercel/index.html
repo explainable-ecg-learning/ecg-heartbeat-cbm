@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>ECG Heartbeat · CBM &amp; CEM Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./static/style.css" />
+</head>
+<body>
+  <header class="site-topbar">
+    <div class="page-wrap topbar-inner">
+      <a class="brand-link" href="#top">
+        <span class="brand-thin">ECG Heartbeat</span> <span class="brand-bold">CBM &amp; CEM</span>
+      </a>
+      <nav class="primary-nav" aria-label="Explorer sections">
+        <a class="nav-link" href="#signal-section">Waveform</a>
+        <a class="nav-link" href="#pipeline-section">Pipeline</a>
+        <a class="nav-link" href="#dense-seg-section">Segmentation</a>
+        <a class="nav-link" href="#benchmark-section">Benchmarks</a>
+      </nav>
+      <div id="device-badge" class="badge">Loading…</div>
+    </div>
+  </header>
+
+  <main id="top" class="page-wrap">
+    <section class="masthead">
+      <div class="masthead-subtitle">Interpretable 12-Lead ECG Analysis · PTB-XL &amp; Georgia 12-Lead (OOD)</div>
+      <h1 class="masthead-title">
+        <span class="name-light">Concept Bottleneck &amp;</span> <span class="name-bold">Concept Embedding Explorer</span>
+      </h1>
+      <p class="masthead-note">
+        Sliding-window activations, per-timestamp soft segmentation (100 Hz), zero-shot external validation, and live concept interventions.
+      </p>
+    </section>
+
+    <!-- ── Controls ─────────────────────────────────────────────────────── -->
+    <section class="controls">
+      <div class="control-row">
+        <label for="model-select">Primary</label>
+        <select id="model-select"><option value="">— loading models… —</option></select>
+
+        <label for="compare-select" class="ml">Compare</label>
+        <select id="compare-select"><option value="">None</option></select>
+
+        <label for="dataset-select" class="ml">Dataset</label>
+        <select id="dataset-select">
+          <option value="ptbxl" selected>PTB-XL (German)</option>
+        </select>
+
+        <label for="fold-select" class="ml" id="fold-label">Split</label>
+        <select id="fold-select">
+          <option value="10" selected>Test (Fold 10)</option>
+          <option value="9">Val (Fold 9)</option>
+          <option value="all">All Folds</option>
+        </select>
+
+        <label for="dx-select" class="ml">Condition</label>
+        <select id="dx-select">
+          <option value="ALL" selected>All</option>
+          <option value="NORM">NORM</option>
+          <option value="MI">MI</option>
+          <option value="STTC">STTC</option>
+          <option value="CD">CD</option>
+          <option value="HYP">HYP</option>
+          <option value="AFIB">AFIB</option>
+          <option value="BBB">BBB (LBBB/RBBB)</option>
+          <option value="PVC">PVC / PAC</option>
+        </select>
+
+        <input id="record-search" type="text" placeholder="ID / Dx…" title="Filter by ECG ID or condition" style="width:76px" />
+        <select id="record-select"><option value="">— loading… —</option></select>
+        <button id="load-btn" class="primary-btn">Load</button>
+      </div>
+
+      <div class="control-row">
+        <label for="lead-select">Lead</label>
+        <select id="lead-select">
+          <option value="0" selected>I</option>
+          <option value="1">II</option>
+          <option value="2">III</option>
+          <option value="3">aVR</option>
+          <option value="4">aVL</option>
+          <option value="5">aVF</option>
+          <option value="6">V1</option>
+          <option value="7">V2</option>
+          <option value="8">V3</option>
+          <option value="9">V4</option>
+          <option value="10">V5</option>
+          <option value="11">V6</option>
+        </select>
+
+        <label for="stride-input" class="ml">Stride</label>
+        <input id="stride-input" type="number" value="20" min="5" max="200" step="5" style="width:68px" />
+        <button id="sweep-btn" class="secondary-btn">Sweep</button>
+        <button id="play-btn" class="secondary-btn" disabled>▶ Play</button>
+        <label class="ml" style="display:inline-flex;align-items:center;gap:0.35rem;cursor:pointer" title="Run MC-Dropout on current window &amp; dense models for Epistemic + Aleatoric decomposition">
+          <input id="epistemic-chk" type="checkbox" /> Epistemic MC
+        </label>
+        <label for="ecg-seg-overlay" class="ml">Seg Shading</label>
+        <select id="ecg-seg-overlay" title="Shade ECG waveform with per-timestamp wave segmentation">
+          <option value="none">Off</option>
+          <option value="dense_cem" selected>Dense CEM</option>
+          <option value="dense_cbm">Dense CBM</option>
+          <option value="zenodo">Zenodo GT</option>
+        </select>
+        <span id="sweep-status" class="status-label"></span>
+      </div>
+    </section>
+
+    <!-- ── Signal + Synchronized Sliding-Window & Per-Timestamp Activations ── -->
+    <section class="card" id="signal-section">
+      <div class="section-header">
+        <h2 class="cv-heading">
+          ECG Waveform &amp; Activations <span id="record-meta" class="meta-label"></span>
+        </h2>
+        <div class="legend-inline">
+          <span class="leg-item"><i class="dot" style="background:#b83b2a"></i>R-peak</span>
+          <span class="leg-item"><i class="dot" style="background:#2b5b84"></i>P-peak</span>
+          <span class="leg-item"><i class="dot" style="background:#2d7a56"></i>T-peak</span>
+          <span class="leg-item"><i class="swatch" style="border:1.5px solid #b83b2a;background:rgba(184,59,42,0.1)"></i>1.0s Window</span>
+        </div>
+      </div>
+      <div id="signal-hint" class="hint">Select a record and click Load to inspect sliding-window and per-timestamp concept activations.</div>
+      <div id="signal-container"></div>
+
+      <!-- Synchronized Activation Timeline / Heatmap -->
+      <div id="timeline-wrapper" style="display:none">
+        <div class="timeline-toolbar">
+          <div class="tab-group" id="timeline-tabs">
+            <button class="tab-btn active" data-view="intervals">Task &amp; Intervals</button>
+            <button class="tab-btn" data-view="waves">Waves (P–U)</button>
+            <button class="tab-btn" data-view="dense">Per-Timestamp Dense</button>
+            <button class="tab-btn" data-view="softseg">Soft Seg Compare</button>
+            <button class="tab-btn" data-view="heatmap">Heatmap</button>
+          </div>
+          <div id="timeline-legend" class="legend-inline"></div>
+        </div>
+        <div id="seg-controls-bar" class="seg-controls-bar" style="display:none">
+          <label for="seg-compare-mode">View</label>
+          <select id="seg-compare-mode">
+            <option value="cem_vs_gt" selected>Dense CEM (solid) vs. Zenodo GT (shaded)</option>
+            <option value="cbm_vs_gt">Dense CBM (solid) vs. Zenodo GT (shaded)</option>
+            <option value="cem_vs_cbm">Dense CEM (solid) vs. Dense CBM (dashed)</option>
+            <option value="gt_only">Zenodo / ECGdeli GT Only</option>
+          </select>
+          <label class="ml" style="display:inline-flex;align-items:center;gap:0.3rem;cursor:pointer">
+            <input id="seg-show-unc" type="checkbox" checked /> Boundary Uncertainty σ(t)
+          </label>
+          <span id="seg-hover-readout" class="meta-label ml"></span>
+        </div>
+        <div id="lineplot-container"></div>
+        <div id="unc-strip-container" style="display:none"></div>
+        <div id="heatmap-container" style="display:none"></div>
+      </div>
+    </section>
+
+    <!-- ── Interactive Pipeline & Live Concept Interventions ────────────── -->
+    <section class="card" id="pipeline-section" style="display:none">
+      <div class="section-header">
+        <h2 class="cv-heading">
+          Window Pipeline &amp; Interventions
+          <span class="window-info" id="window-pos-label"></span>
+          <span class="gt-pill" id="gt-window-pill"></span>
+        </h2>
+        <div class="intervention-actions">
+          <span class="meta-label">Click pill to intervene (Auto → 1 → 0)</span>
+          <button id="reset-int-btn" class="secondary-btn small-btn" style="display:none">Reset</button>
+        </div>
+      </div>
+
+      <div class="pipeline">
+        <!-- 1. Input window -->
+        <div class="pipe-panel pipe-panel--input">
+          <div class="pipe-panel-title">Input Window (1.0s)</div>
+          <div id="window-plot"></div>
+        </div>
+
+        <!-- Connector: Encoder -->
+        <div class="pipe-connector">
+          <svg class="pipe-sym" viewBox="0 0 64 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="2,11 8,4 14,13 20,6 26,12 32,4 38,12 44,6 50,11 56,7 62,11"
+              stroke="#222222" stroke-width="1.4" opacity="0.7" stroke-linecap="round"/>
+            <rect x="5"  y="17" width="54" height="6" rx="1.5" fill="#767676" opacity="0.22"/>
+            <rect x="10" y="27" width="44" height="6" rx="1.5" fill="#767676" opacity="0.35"/>
+            <rect x="16" y="37" width="32" height="6" rx="1.5" fill="#767676" opacity="0.5"/>
+            <rect x="22" y="47" width="20" height="6" rx="1.5" fill="#222222" opacity="0.65"/>
+            <line x1="32" y1="53" x2="32" y2="62" stroke="#d0d0d0" stroke-width="1.5"/>
+            <rect x="14" y="62" width="36" height="11" rx="1.5" fill="#222222"/>
+            <text x="32" y="70" text-anchor="middle" fill="#ffffff" font-size="5.5" font-family="monospace">z ∈ ℝ⁵¹²</text>
+          </svg>
+          <div class="pipe-arrow-row">
+            <div class="pipe-arrow-line"></div>
+            <span class="pipe-arrow-tip">▶</span>
+          </div>
+          <div class="pipe-label">1D ResNet</div>
+        </div>
+
+        <!-- 2. Concept activations + Intervention toggles -->
+        <div class="pipe-panel pipe-panel--concepts">
+          <div class="pipe-panel-title" id="concepts-panel-title">Concept Activations &amp; Interventions</div>
+          <div id="histogram-container"></div>
+          <div id="intervention-controls" class="intervention-bar"></div>
+        </div>
+
+        <!-- Connector: Predictor -->
+        <div class="pipe-connector">
+          <svg class="pipe-sym" viewBox="0 0 64 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="14" r="3.2" fill="#767676" opacity="0.7"/>
+            <circle cx="10" cy="30" r="3.2" fill="#767676" opacity="0.7"/>
+            <circle cx="10" cy="46" r="3.2" fill="#767676" opacity="0.7"/>
+            <circle cx="10" cy="62" r="3.2" fill="#767676" opacity="0.7"/>
+            <line x1="13.5" y1="14" x2="46" y2="38" stroke="#d0d0d0" stroke-width="1"/>
+            <line x1="13.5" y1="30" x2="46" y2="38" stroke="#d0d0d0" stroke-width="1"/>
+            <line x1="13.5" y1="46" x2="46" y2="38" stroke="#d0d0d0" stroke-width="1"/>
+            <line x1="13.5" y1="62" x2="46" y2="38" stroke="#d0d0d0" stroke-width="1"/>
+            <circle cx="52" cy="38" r="8" fill="#b83b2a"/>
+            <text x="52" y="41.5" text-anchor="middle" fill="#ffffff" font-size="9">σ</text>
+            <text x="52" y="55" text-anchor="middle" fill="#767676" font-size="6" font-family="monospace">p(y)</text>
+          </svg>
+          <div class="pipe-arrow-row">
+            <div class="pipe-arrow-line"></div>
+            <span class="pipe-arrow-tip">▶</span>
+          </div>
+          <div class="pipe-label" id="predictor-label">Bottleneck</div>
+        </div>
+
+        <!-- 3. Task prediction (Primary + Compare) -->
+        <div class="pipe-panel pipe-panel--task">
+          <div class="pipe-panel-title">Heartbeat Completeness</div>
+          <div id="task-pred-container"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Per-Timestamp Dense Segmentation & Pathology Interventions ─────── -->
+    <section class="card" id="dense-seg-section" style="display:none">
+      <div class="section-header">
+        <h2 class="cv-heading">
+          Per-Timestamp Soft Segmentation (100 Hz) &amp; Pathology
+          <span class="meta-label" id="dense-seg-status"></span>
+        </h2>
+        <div class="intervention-actions">
+          <label for="dense-int-scope">Scope</label>
+          <select id="dense-int-scope">
+            <option value="record" selected>Full 10s Record</option>
+            <option value="window">Selected 1.0s Window</option>
+          </select>
+          <button id="dense-gt-int-btn" class="secondary-btn small-btn" title="Substitute Zenodo GT soft masks into Dense CBM &amp; Dense CEM">Apply GT Masks</button>
+          <button id="dense-reset-int-btn" class="secondary-btn small-btn" style="display:none">Reset</button>
+        </div>
+      </div>
+      <div class="seg-controls-bar" style="margin-bottom:0.75rem">
+        <label for="dense-primary-select">Dense Primary</label>
+        <select id="dense-primary-select"><option value="">— loading… —</option></select>
+
+        <label for="dense-compare-select" class="ml">Dense Compare</label>
+        <select id="dense-compare-select"><option value="">None</option></select>
+
+        <label for="dense-blackbox-select" class="ml">Black-Box Ref</label>
+        <select id="dense-blackbox-select"><option value="">None</option></select>
+      </div>
+      <div class="dense-grid">
+        <div class="dense-panel">
+          <div class="pipe-panel-title">Wave-Mask Interventions (Auto → Ablate 0 → Force 1)</div>
+          <div id="dense-wave-pills" class="dense-pill-bar"></div>
+          <div id="dense-pathology-bars" class="dense-patho-container"></div>
+        </div>
+        <div class="dense-panel">
+          <div class="pipe-panel-title" id="dense-benchmark-title">Per-Timestamp Test Benchmark · Fold 10 (2.20M Timestamps)</div>
+          <div id="dense-metrics-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Model Metrics & Test-Time Intervention Curves ─────────────────── -->
+    <section class="card" id="benchmark-section">
+      <div class="section-header">
+        <h2 class="cv-heading">
+          Test Evaluation &amp; Intervention Curves
+          <span class="meta-label" id="benchmark-subtitle">PTB-XL Fold 10</span>
+        </h2>
+      </div>
+      <div class="benchmark-grid">
+        <div id="metrics-summary-container" class="metrics-col"></div>
+        <div id="intervention-curve-container" class="curve-col"></div>
+      </div>
+    </section>
+
+    <footer class="minimal-footer">
+      <div class="minimal-footer-row">
+        <span>ECG Heartbeat CBM &amp; CEM · PTB-XL, Zenodo 7610236 (ECGdeli U-Net) &amp; Georgia 12-Lead ECG (ecg-data-repo)</span>
+        <span class="meta-label">Local FastAPI + D3 v7 Explorer</span>
+      </div>
+    </footer>
+  </main>
+
+  <script src="./static/vendor/d3.v7.min.js"></script>
+  <script>window.EXPLORER_STATIC_MODE = true;</script>
+  <script src="./static/main.js"></script>
+</body>
+</html>

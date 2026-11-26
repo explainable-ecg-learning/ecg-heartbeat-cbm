@@ -28,12 +28,12 @@
 
   <main id="top" class="page-wrap">
     <section class="masthead">
-      <div class="masthead-subtitle">Interpretable 12-Lead ECG Analysis · PTB-XL</div>
+      <div class="masthead-subtitle">Interpretable 12-Lead ECG Analysis · PTB-XL &amp; Georgia 12-Lead (OOD)</div>
       <h1 class="masthead-title">
         <span class="name-light">Concept Bottleneck &amp;</span> <span class="name-bold">Concept Embedding Explorer</span>
       </h1>
       <p class="masthead-note">
-        Sliding-window activations, per-timestamp soft segmentation (100 Hz), uncertainty decomposition, and live concept interventions.
+        Sliding-window activations, per-timestamp soft segmentation (100 Hz), zero-shot external validation, and live concept interventions.
       </p>
     </section>
 
@@ -46,7 +46,12 @@
         <label for="compare-select" class="ml">Compare</label>
         <select id="compare-select"><option value="">None</option></select>
 
-        <label for="fold-select" class="ml">Split</label>
+        <label for="dataset-select" class="ml">Dataset</label>
+        <select id="dataset-select">
+          <option value="ptbxl" selected>PTB-XL (German)</option>
+        </select>
+
+        <label for="fold-select" class="ml" id="fold-label">Split</label>
         <select id="fold-select">
           <option value="10" selected>Test (Fold 10)</option>
           <option value="9">Val (Fold 9)</option>
@@ -66,7 +71,7 @@
           <option value="PVC">PVC / PAC</option>
         </select>
 
-        <input id="record-search" type="text" placeholder="ID…" title="Filter by ECG ID" style="width:66px" />
+        <input id="record-search" type="text" placeholder="ID / Dx…" title="Filter by ECG ID or condition" style="width:76px" />
         <select id="record-select"><option value="">— loading… —</option></select>
         <button id="load-btn" class="primary-btn">Load</button>
       </div>
@@ -265,7 +270,7 @@
           <div id="dense-pathology-bars" class="dense-patho-container"></div>
         </div>
         <div class="dense-panel">
-          <div class="pipe-panel-title">Per-Timestamp Test Benchmark · Fold 10 (2.20M Timestamps)</div>
+          <div class="pipe-panel-title" id="dense-benchmark-title">Per-Timestamp Test Benchmark · Fold 10 (2.20M Timestamps)</div>
           <div id="dense-metrics-table"></div>
         </div>
       </div>
@@ -287,7 +292,7 @@
 
     <footer class="minimal-footer">
       <div class="minimal-footer-row">
-        <span>ECG Heartbeat CBM &amp; CEM · PTB-XL &amp; Zenodo 7610236 (ECGdeli U-Net)</span>
+        <span>ECG Heartbeat CBM &amp; CEM · PTB-XL, Zenodo 7610236 (ECGdeli U-Net) &amp; Georgia 12-Lead ECG (ecg-data-repo)</span>
         <span class="meta-label">Local FastAPI + D3 v7 Explorer</span>
       </div>
     </footer>
