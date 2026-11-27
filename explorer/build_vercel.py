@@ -682,6 +682,13 @@ def main() -> None:
         preload_tags + '<link rel="stylesheet" href="./static/style.css"',
     )
     html = html.replace('href="/static/style.css"', 'href="./static/style.css"')
+    analytics_tags = (
+        '  <script>\n'
+        '    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };\n'
+        '  </script>\n'
+        '  <script defer src="/_vercel/insights/script.js"></script>\n'
+    )
+    html = html.replace("</head>", analytics_tags + "</head>", 1)
     html = html.replace('src="/static/vendor/d3.v7.min.js"', 'src="./static/vendor/d3.v7.min.js"')
     html = html.replace(
         'src="/static/main.js"></script>',

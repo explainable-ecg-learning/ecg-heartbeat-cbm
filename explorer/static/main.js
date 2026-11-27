@@ -627,9 +627,6 @@ async function init() {
   renderExternalComparisonTable();
   setupPresetButtons();
   setupStoryScrollSpy();
-  setupQuestionNavigator();
-  setupQuickOptions();
-  updateExplorerModeNote();
   await loadRecordList();
   await refreshBenchmarks();
 
@@ -938,148 +935,6 @@ function applyDatasetControls(switchLead = true) {
   renderMetricsTable();
 }
 
-const MODEL_DESCRIPTIONS = {
-  cem_softseg:            "CEM (500 Hz): concept embeddings (c+, c-) match Black-Box accuracy while allowing exact interventions",
-  cbm_softseg_masked:     "CBM Masked (500 Hz): scalar bottleneck with unlabeled U-wave blocked to cut concept impurity (OIS)",
-  blackbox_softseg:       "Black-Box (500 Hz): unconstrained 1D ResNet predicting completeness without concept explanations",
-  dense_cem_s42:          "DenseCEM (100 Hz): per-timestamp wave embeddings — matches Black-Box pathology with 2.23× boundary σ(t)",
-  dense_cbm_detached_s42: "DenseCBM Detached (100 Hz): stops task gradients into masks — sharpest Dice (0.947) and zero leakage (Δ=-0.002)",
-  dense_cbm_joint_s42:    "DenseCBM Joint (100 Hz): end-to-end mask + pathology co-training",
-  dense_multitask_s42:    "DenseMultiTask (100 Hz): shared backbone predicting pathology & masks in parallel (non-causal)",
-  dense_blackbox_s42:     "DenseBlackBox (100 Hz): standard ResNet classifier with no wave segmentation or concept bottleneck",
-};
-
-function describeModel(id, mtype) {
-  if (id && MODEL_DESCRIPTIONS[id]) return MODEL_DESCRIPTIONS[id];
-  const t = String(mtype || "").toLowerCase();
-  if (t.includes("cem")) return "Concept Embedding Model (embeddings per concept; intervenable)";
-  if (t.includes("cbm")) return "Concept Bottleneck Model (scalar concept probabilities; causally faithful)";
-  if (t.includes("multitask")) return "Multi-Task ResNet (auxiliary masks only; non-causal pathology head)";
-  return "Black-Box ResNet baseline (no concept bottleneck)";
-}
-
-function updateExplorerModeNote() {
-  const el = document.getElementById("explorer-mode-note");
-  if (!el) return;
-  const modeMsg = STATIC_MODE
-    ? "Running on static CDN bundles (exact linear head math + 10-bin window interventions). Append <code>?api=https://your-host</code> for a live FastAPI GPU/CPU backend."
-    : "Connected to live FastAPI PyTorch backend (full cohort search & arbitrary strides/spans, using pre-calculated cache where available).";
-  el.innerHTML = `${modeMsg} Import custom NumPy arrays with: <code>.venv_new/bin/python explorer/convert_numpy.py cohort.npz --dataset-id my_cohort --fs 500</code>`;
-}
-
-function updateDenseModelNote() {
-  const el = document.getElementById("dense-model-note");
-  if (!el) return;
-  const parts = [];
-  if (state.densePrimary) parts.push(`<strong>Primary</strong>: ${describeModel(state.densePrimary, "")}`);
-  if (state.denseCompare) parts.push(`<strong>Compare</strong>: ${describeModel(state.denseCompare, "")}`);
-  el.innerHTML = parts.join(" &nbsp;|&nbsp; ");
-}
-
-function setupQuestionNavigator() {
-  document.querySelectorAll("[data-jump-act]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const actSel = btn.dataset.jumpAct;
-      const preset = btn.dataset.jumpPreset;
-      const wantEp = btn.dataset.jumpEpistemic === "1";
-      if (wantEp) {
-        const ep = document.getElementById("epistemic-chk");
-        const qEp = document.getElementById("quick-epistemic-chk");
-        if (ep && !ep.checked) {
-          ep.checked = true;
-          if (qEp) qEp.checked = true;
-        }
-      }
-      if (preset) {
-        await applyPresetCase(preset, actSel);
-        if (wantEp) {
-          updatePipeline();
-          runDenseInfer();
-        }
-        return;
-      }
-      if (wantEp && state.ecgId !== null) {
-        updatePipeline();
-        runDenseInfer();
-      }
-      if (actSel) {
-        const target = document.getElementById(actSel.replace(/^#/, ""));
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    });
-  });
-}
-
-function syncQuickOptions() {
-  const pairBtns = document.querySelectorAll("[data-model-pair]");
-  const p = state.primaryModel || "";
-  const c = state.compareModel || "";
-  const isCem = p.includes("cem");
-  const isCbm = p.includes("cbm");
-  const cmpCbm = c.includes("cbm");
-  const cmpBb  = c.includes("blackbox");
-
-  pairBtns.forEach(btn => {
-    const k = btn.dataset.modelPair;
-    const active =
-      (k === "cem_cbm" && isCem && cmpCbm) ||
-      (k === "cem_bb"  && isCem && cmpBb)  ||
-      (k === "cbm_bb"  && isCbm && cmpBb);
-    btn.classList.toggle("active", active);
-  });
-
-  const ep  = document.getElementById("epistemic-chk");
-  const qEp = document.getElementById("quick-epistemic-chk");
-  if (ep && qEp) qEp.checked = ep.checked;
-}
-
-function setupQuickOptions() {
-  const models = state.models || [];
-  const findId = (pred, fallback = "") => (models.find(pred)?.id || fallback);
-  const cemId = findId(m => m.id === "cem_softseg" || m.model_type === "cem");
-  const cbmId = findId(m => m.id === "cbm_softseg_masked" || m.model_type === "cbm");
-  const bbId  = findId(m => m.id === "blackbox_softseg" || m.model_type === "blackbox");
-
-  document.querySelectorAll("[data-model-pair]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const pair = btn.dataset.modelPair;
-      let nextP = cemId, nextC = cbmId;
-      if (pair === "cem_bb") { nextP = cemId; nextC = bbId; }
-      else if (pair === "cbm_bb") { nextP = cbmId; nextC = bbId; }
-      if (!nextP) return;
-
-      state.primaryModel = nextP;
-      state.compareModel = nextC || "";
-      const pSel = document.getElementById("model-select");
-      const cSel = document.getElementById("compare-select");
-      if (pSel) pSel.value = state.primaryModel;
-      if (cSel) cSel.value = state.compareModel;
-      syncQuickOptions();
-      await refreshBenchmarks();
-      if (state.ecgId !== null) await runSweep();
-    });
-  });
-
-  const qEp = document.getElementById("quick-epistemic-chk");
-  const ep  = document.getElementById("epistemic-chk");
-  if (qEp && ep) {
-    qEp.addEventListener("change", () => {
-      ep.checked = qEp.checked;
-      updatePipeline();
-      runDenseInfer();
-    });
-  }
-
-  const openBtn = document.getElementById("open-controls-btn");
-  const drawer  = document.getElementById("controls-drawer");
-  if (openBtn && drawer) {
-    openBtn.addEventListener("click", () => {
-      drawer.open = !drawer.open;
-    });
-  }
-  syncQuickOptions();
-}
-
 async function loadModels() {
   const data = await apiGet("/models");
   state.models = data.models || [];
@@ -1095,13 +950,9 @@ async function loadModels() {
     const label = `${m.id} [${m.model_type.toUpperCase()}]`;
     const o1 = new Option(label, m.id, false, m.id === state.primaryModel);
     const o2 = new Option(label, m.id, false, m.id === state.compareModel);
-    const tip = describeModel(m.id, m.model_type);
-    o1.title = tip;
-    o2.title = tip;
     primSel.appendChild(o1);
     cmpSel.appendChild(o2);
   });
-  syncQuickOptions();
 }
 
 async function loadRecordList() {
@@ -1514,17 +1365,11 @@ async function loadDenseModels() {
       models.forEach(m => {
         const tag = m.model_type.replace(/^dense_/, "").toUpperCase();
         const label = `${m.id} [${tag}]`;
-        const tip = describeModel(m.id, m.model_type);
-        const o1 = new Option(label, m.id, false, m.id === state.densePrimary);
-        const o2 = new Option(label, m.id, false, m.id === state.denseCompare);
-        const o3 = new Option(label, m.id, false, m.id === state.denseBlackbox);
-        o1.title = tip; o2.title = tip; o3.title = tip;
-        primSel.appendChild(o1);
-        cmpSel.appendChild(o2);
-        bbSel.appendChild(o3);
+        primSel.appendChild(new Option(label, m.id, false, m.id === state.densePrimary));
+        cmpSel.appendChild(new Option(label, m.id, false, m.id === state.denseCompare));
+        bbSel.appendChild(new Option(label, m.id, false, m.id === state.denseBlackbox));
       });
     }
-    updateDenseModelNote();
     renderDenseMetricsTable();
     renderDenseWavePills();
   } else {
@@ -1875,54 +1720,6 @@ function renderDenseMetricsTable() {
     vals.forEach(v => {
       const isBest = v !== undefined && bestVal !== null && v === bestVal;
       html += `<td class="${isBest ? "best" : ""}">${v !== undefined ? r.fmt(v) : "—"}</td>`;
-    });
-    html += `</tr>`;
-  });
-  html += `</tbody></table>`;
-  el.innerHTML = html;
-  renderDenseLeakageBreakdown(shown);
-}
-
-function renderDenseLeakageBreakdown(shownModels) {
-  const el = document.getElementById("dense-leakage-table");
-  if (!el) return;
-  const shown = shownModels || [];
-  if (!shown.length) {
-    el.innerHTML = "";
-    return;
-  }
-  const rows = [
-    { label: "P Soft-Dice",                 key: "seg/P/soft_dice",               higher: true,  fmt: v => v.toFixed(4) },
-    { label: "PQ Soft-Dice",                key: "seg/PQ/soft_dice",              higher: true,  fmt: v => v.toFixed(4) },
-    { label: "QRS Soft-Dice",               key: "seg/QRS/soft_dice",             higher: true,  fmt: v => v.toFixed(4) },
-    { label: "ST Soft-Dice",                key: "seg/ST/soft_dice",              higher: true,  fmt: v => v.toFixed(4) },
-    { label: "T Soft-Dice",                 key: "seg/T/soft_dice",               higher: true,  fmt: v => v.toFixed(4) },
-    { label: "TP Soft-Dice",                key: "seg/TP/soft_dice",              higher: true,  fmt: v => v.toFixed(4) },
-    { label: "GT Mask Probe AUROC",         key: "leakage/gt_mask_probe_auroc",   higher: true,  fmt: v => v.toFixed(4) },
-    { label: "Pred Mask Probe AUROC",       key: "leakage/pred_mask_probe_auroc", higher: false, fmt: v => v.toFixed(4) },
-    { label: "Soft Mask Excess ΔAUROC ↓",   key: "leakage/soft_mask_excess_auroc",higher: false, fmt: v => v.toFixed(4), absCmp: true },
-  ];
-  let html = `<table class="metrics-table"><thead><tr><th>Dense Wave Dice &amp; Leakage Probes</th>`;
-  shown.forEach(m => { html += `<th>${m.id}</th>`; });
-  html += `</tr></thead><tbody>`;
-  rows.forEach(r => {
-    const vals = shown.map(m => {
-      const v = m.metrics?.[r.key];
-      return (typeof v === "number" && !Number.isNaN(v)) ? v : undefined;
-    });
-    if (vals.every(v => v === undefined)) return;
-    const valid = vals.filter(v => v !== undefined);
-    const best = valid.length > 1
-      ? valid.reduce((a, b) => {
-          const va = r.absCmp ? Math.abs(a) : a;
-          const vb = r.absCmp ? Math.abs(b) : b;
-          return (r.higher ? vb > va : vb < va) ? b : a;
-        })
-      : null;
-    html += `<tr><td>${r.label}</td>`;
-    vals.forEach(v => {
-      const cls = (v !== undefined && best !== null && v === best) ? "best" : "";
-      html += `<td class="${cls}">${v !== undefined ? r.fmt(v) : "—"}</td>`;
     });
     html += `</tr>`;
   });
@@ -2336,17 +2133,15 @@ function updatePipelineFromSweep() {
   } : null;
 
   renderPipelineValues({
-    model_id:       d.model_id,
-    model_type:     d.model_type,
-    task_prob:      d.task_probs[ni],
-    task_std:       d.task_stds[ni],
-    task_aleatoric: d.task_stds[ni],
-    task_epistemic: 0.0,
-    concept_probs:  d.concept_probs[ni],
-    concept_stds:   d.concept_stds[ni],
-    gt_task:        gtT,
-    gt_concepts:    gtC,
-    compare:        cmp,
+    model_id:      d.model_id,
+    model_type:    d.model_type,
+    task_prob:     d.task_probs[ni],
+    task_std:      d.task_stds[ni],
+    concept_probs: d.concept_probs[ni],
+    concept_stds:  d.concept_stds[ni],
+    gt_task:       gtT,
+    gt_concepts:   gtC,
+    compare:       cmp,
   });
 }
 
@@ -2412,25 +2207,10 @@ function renderPipelineValues(res) {
     gtPill.className   = "gt-pill";
   }
 
-  const hasInt = Object.keys(state.interventions || {}).length > 0;
-  let baseProb = null, cmpBaseProb = null;
-  if (hasInt && state.sweepData?.starts?.length) {
-    const ni = findNearestSweepIndex(state.windowStart);
-    baseProb = state.sweepData.task_probs?.[ni] ?? null;
-    if (state.sweepData.compare?.task_probs) {
-      cmpBaseProb = state.sweepData.compare.task_probs[ni] ?? null;
-    }
-  }
-
   const cmpProbs = cmpHasConcepts ? res.compare.concept_probs : null;
   renderHistogram(res.concept_probs, res.concept_stds, res.gt_concepts, cmpProbs, primIsBB);
   renderInterventionPills(!primIsBB);
-  renderTaskPrediction(res.model_id, res.task_prob, res.task_std, res.compare, {
-    taskAle: res.task_aleatoric,
-    taskEpi: res.task_epistemic,
-    baseProb,
-    cmpBaseProb,
-  });
+  renderTaskPrediction(res.model_id, res.task_prob, res.task_std, res.compare);
 }
 
 function renderInterventionPills(canIntervene = true) {
@@ -2594,14 +2374,13 @@ function renderHistogram(probs, stds, gtConcepts, cmpProbs, primIsBlackbox = fal
   g.append("text").attr("x", lx + 13).attr("y", -8).attr("fill", "#767676").attr("font-size", 8).text("±1σ");
 }
 
-// ── Task Prediction Bar Chart (Primary vs Compare + Baseline + Epistemic) ──
-function renderTaskPrediction(modelId, taskProb, taskStd, cmpObj, opts = {}) {
+// ── Task Prediction Bar Chart (Primary vs Compare side-by-side) ────────────
+function renderTaskPrediction(modelId, taskProb, taskStd, cmpObj) {
   const container = document.getElementById("task-pred-container");
   container.innerHTML = "";
-  const uncBox = document.getElementById("task-unc-breakdown");
 
-  const W = 196, H = 188;
-  const pad = { top: 22, right: 12, bottom: 38, left: 36 };
+  const W = 196, H = 195;
+  const pad = { top: 22, right: 12, bottom: 42, left: 36 };
   const iW = W - pad.left - pad.right, iH = H - pad.top - pad.bottom;
 
   const svg = d3.select(container).append("svg").attr("width", W).attr("height", H);
@@ -2609,12 +2388,12 @@ function renderTaskPrediction(modelId, taskProb, taskStd, cmpObj, opts = {}) {
 
   const items = cmpObj
     ? [
-        { label: modelId,         p: taskProb,        s: taskStd || 0,        b: opts.baseProb ?? null },
-        { label: cmpObj.model_id, p: cmpObj.task_prob, s: cmpObj.task_std || 0, b: (cmpObj.model_type === "blackbox" ? null : (opts.cmpBaseProb ?? null)) },
+        { label: modelId,        p: taskProb,        s: taskStd || 0 },
+        { label: cmpObj.model_id, p: cmpObj.task_prob, s: cmpObj.task_std || 0 },
       ]
     : [
-        { label: "Complete",   p: taskProb,     s: taskStd || 0, b: opts.baseProb ?? null },
-        { label: "Incomplete", p: 1 - taskProb, s: 0,            b: null },
+        { label: "Complete",   p: taskProb,     s: taskStd || 0 },
+        { label: "Incomplete", p: 1 - taskProb, s: 0 },
       ];
 
   const xScale = d3.scaleBand().domain(items.map(d => d.label)).range([0, iW]).padding(0.32);
@@ -2642,42 +2421,16 @@ function renderTaskPrediction(modelId, taskProb, taskStd, cmpObj, opts = {}) {
         .attr("fill", "#a67c00").attr("opacity", 0.24);
     }
 
-    if (it.b !== null && it.b !== undefined) {
-      const yb = yScale(it.b);
-      g.append("line")
-        .attr("x1", x - 2).attr("x2", x + bW + 2).attr("y1", yb).attr("y2", yb)
-        .attr("stroke", "#222222").attr("stroke-width", 2.0);
-    }
-
     g.append("text").attr("x", x + bW / 2).attr("y", Math.max(yT - 5, 9))
       .attr("text-anchor", "middle").attr("fill", "#222222").attr("font-size", 10).attr("font-weight", 600)
       .text(`${(it.p * 100).toFixed(1)}%`);
 
     if (it.s > 0) {
-      g.append("text").attr("x", x + bW / 2).attr("y", iH + 26)
+      g.append("text").attr("x", x + bW / 2).attr("y", iH + 28)
         .attr("text-anchor", "middle").attr("fill", "#767676").attr("font-size", 8)
         .text(`±${(it.s * 100).toFixed(1)}%`);
     }
   });
-
-  if (uncBox) {
-    const parts = [];
-    if (opts.baseProb !== null && opts.baseProb !== undefined) {
-      const diff = (taskProb - opts.baseProb) * 100;
-      const sign = diff > 0.05 ? "+" : "";
-      const cls  = diff > 0.5 ? "pos" : (diff < -0.5 ? "neg" : "neu");
-      parts.push(`<span class="delta-badge ${cls}" title="Shift vs pre-intervention probability (${(opts.baseProb * 100).toFixed(1)}%)">Δ ${sign}${diff.toFixed(1)}% vs base</span>`);
-    }
-    const wantEp = document.getElementById("epistemic-chk")?.checked;
-    const ale = opts.taskAle ?? taskStd ?? 0;
-    const epi = opts.taskEpi ?? 0;
-    if (wantEp || epi > 0) {
-      parts.push(`<span title="Aleatoric = concept noise; Epistemic = MC-Dropout model/OOD disagreement">Ale ±${(ale * 100).toFixed(1)}% · Epi ±${(epi * 100).toFixed(1)}%</span>`);
-    } else if (ale > 0) {
-      parts.push(`<span>Ale ±${(ale * 100).toFixed(1)}% (enable Epistemic MC for split)</span>`);
-    }
-    uncBox.innerHTML = parts.join("");
-  }
 }
 
 // ── Benchmark Summary & Concept Intervention Curves ────────────────────────
@@ -2695,50 +2448,8 @@ async function refreshBenchmarks() {
     state.compareSummary = null;
   }
 
-  renderConceptWeights();
   renderMetricsTable();
   renderInterventionCurves();
-}
-
-function renderConceptWeights() {
-  const panel = document.getElementById("concept-weights-panel");
-  const bars  = document.getElementById("concept-weights-bars");
-  const note  = document.getElementById("concept-weights-note");
-  if (!panel || !bars) return;
-
-  const s = state.primarySummary;
-  if (!s) {
-    bars.innerHTML = "";
-    return;
-  }
-  if (s.model_type === "blackbox") {
-    if (note) note.textContent = `${s.id} has no concept bottleneck`;
-    bars.innerHTML = `<div class="hint" style="grid-column:1/-1">Black-Box ResNet predicts directly from dense features z ∈ ℝ⁵¹² — no interpretable concept weights exist.</div>`;
-    return;
-  }
-  const cw = s.classifier_weights || {};
-  const names = s.concept_names || Object.keys(cw);
-  const absMax = Math.max(1e-6, ...names.map(n => Math.abs(cw[n]?.prob_weight || 0)));
-  if (note) {
-    note.textContent = s.model_type === "cem"
-      ? `${s.id} · mean |w_c| L2 norm of concept embeddings (0 = masked)`
-      : `${s.id} · linear classifier weight w_c (+ pushes Complete, 0 = masked)`;
-  }
-
-  bars.innerHTML = names.map((n, i) => {
-    const entry = cw[n] || {};
-    const w = Number(entry.prob_weight || 0);
-    const u = Number(entry.uncert_weight || 0);
-    const pct = Math.min(100, Math.round((Math.abs(w) / absMax) * 100));
-    const isMasked = Math.abs(w) < 1e-4;
-    const col = isMasked ? "#bbbbbb" : conceptColor(n, i);
-    const title = `${n}: prob_weight=${w.toFixed(4)}${u ? `, uncert_weight=${u.toFixed(4)}` : ""}${isMasked ? " (masked/unsupervised)" : ""}`;
-    return `
-      <div class="weight-item" title="${title}">
-        <div class="weight-top${isMasked ? " masked" : ""}"><span>${n}</span><span>${w >= 0 && s.model_type !== "cem" ? "+" : ""}${w.toFixed(2)}</span></div>
-        <div class="weight-track"><div class="weight-fill" style="width:${pct}%;background:${col}"></div></div>
-      </div>`;
-  }).join("");
 }
 
 function renderMetricsTable() {
@@ -2811,45 +2522,6 @@ function renderMetricsTable() {
     });
   }
 
-  html += `</tbody></table>`;
-  el.innerHTML = html;
-  renderPerConceptBreakdown();
-}
-
-function renderPerConceptBreakdown() {
-  const el = document.getElementById("per-concept-table");
-  if (!el) return;
-  const p = state.primarySummary, c = state.compareSummary;
-  if (!p?.metrics) {
-    el.innerHTML = "";
-    return;
-  }
-  const hasCmp = Boolean(c?.metrics);
-  const concepts = p.concept_names || ["P", "Q", "R", "S", "T", "U", "PR", "QRS", "ST", "QT"];
-  let html = `<table class="metrics-table"><thead><tr><th>Concept (500 Hz F1 / AUROC)</th><th>${p.id}</th>`;
-  if (hasCmp) html += `<th>${c.id}</th>`;
-  html += `</tr></thead><tbody>`;
-
-  const fmtPair = (m, name) => {
-    const f1 = m[`concept/${name}/f1`];
-    const au = m[`concept/${name}/auroc`];
-    if (f1 === undefined && au === undefined) return "—";
-    return `${f1 !== undefined ? f1.toFixed(3) : "—"} / ${au !== undefined ? au.toFixed(3) : "—"}`;
-  };
-
-  concepts.forEach(name => {
-    const fp = p.metrics[`concept/${name}/f1`];
-    const fc = hasCmp ? c.metrics[`concept/${name}/f1`] : undefined;
-    const sp = fmtPair(p.metrics, name);
-    const sc = hasCmp ? fmtPair(c.metrics, name) : "—";
-    if (sp === "—" && sc === "—") return;
-    let pCls = "", cCls = "";
-    if (fp !== undefined && fc !== undefined) {
-      if (fp > fc) pCls = "best";
-      else if (fc > fp) cCls = "best";
-    }
-    html += `<tr><td>${name}</td><td class="${pCls}">${sp}</td>${hasCmp ? `<td class="${cCls}">${sc}</td>` : ""}</tr>`;
-  });
   html += `</tbody></table>`;
   el.innerHTML = html;
 }
@@ -3011,7 +2683,6 @@ document.getElementById("record-search").addEventListener("input", () => {
   window._searchDeb = setTimeout(loadRecordList, 200);
 });
 document.getElementById("epistemic-chk").addEventListener("change", () => {
-  syncQuickOptions();
   updatePipeline();
   runDenseInfer();
 });
@@ -3044,21 +2715,18 @@ document.getElementById("dense-int-scope").addEventListener("change", () => {
 
 document.getElementById("dense-primary-select")?.addEventListener("change", async e => {
   state.densePrimary = e.target.value;
-  updateDenseModelNote();
   renderDenseMetricsTable();
   await runDenseInfer();
 });
 
 document.getElementById("dense-compare-select")?.addEventListener("change", async e => {
   state.denseCompare = e.target.value;
-  updateDenseModelNote();
   renderDenseMetricsTable();
   await runDenseInfer();
 });
 
 document.getElementById("dense-blackbox-select")?.addEventListener("change", async e => {
   state.denseBlackbox = e.target.value;
-  updateDenseModelNote();
   renderDenseMetricsTable();
   await runDenseInfer();
 });
@@ -3091,14 +2759,12 @@ new ResizeObserver(() => {
 
 document.getElementById("model-select").addEventListener("change", async e => {
   state.primaryModel = e.target.value;
-  syncQuickOptions();
   await refreshBenchmarks();
   if (state.ecgId !== null) await runSweep();
 });
 
 document.getElementById("compare-select").addEventListener("change", async e => {
   state.compareModel = e.target.value;
-  syncQuickOptions();
   await refreshBenchmarks();
   if (state.ecgId !== null) await runSweep();
 });
