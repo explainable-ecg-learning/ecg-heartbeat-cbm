@@ -193,6 +193,9 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 # Or preview/deploy zero-cold-start static Vercel bundle (explorer/vercel/, 30 curated ECGs)
 CUDA_VISIBLE_DEVICES=0 python explorer/build_vercel.py
 python3 -m http.server 8041 --directory explorer/vercel
+
+# Or convert & import your own NumPy ECG arrays (.npy / .npz / folder) into the Explorer
+.venv_new/bin/python explorer/convert_numpy.py path/to/ecgs.npz --dataset-id my_cohort --dataset-label "My Cohort" --fs 500
 ```
 
 The Explorer (`http://127.0.0.1:8040`) features a minimal editorial UI, dataset switcher (**PTB-XL** ↔ **Georgia 12-Lead OOD**), live model comparison, and strict JSON validation:
@@ -244,6 +247,7 @@ explorer/
   index.html             — Minimal editorial D3 v7 UI
   static/                — Frontend JS (live + static Vercel adapter), CSS, and vendored D3 v7
   build_vercel.py        — Static CDN + exact linear head exporter for zero-cold-start Vercel hosting
+  convert_numpy.py       — NumPy (.npy / .npz / dir) converter into pre-calculated Explorer bundles
   vercel/                — Deployable Vercel root directory (vercel.json, static UI + 30 curated ECG bundles)
   run.sh                 — Local Uvicorn launch script (defaults to 127.0.0.1:8040)
   Dockerfile             — Self-contained Explorer container image (BuildKit context: repo root)

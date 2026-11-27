@@ -47,6 +47,33 @@
         uncertainty (<code>100 Hz</code>), and zero-shot generalization on unseen US hospital ECGs.
       </p>
 
+      <div class="paradigm-grid" aria-label="Concept model paradigms overview">
+        <div class="paradigm-card">
+          <div class="paradigm-head"><span class="paradigm-tag">Black-Box</span><code class="paradigm-formula">x → z → y</code></div>
+          <p>Unconstrained ResNet capacity. Strong in-domain accuracy, but zero wave localization, zero explanation, and zero test-time correction.</p>
+        </div>
+        <div class="paradigm-card">
+          <div class="paradigm-head"><span class="paradigm-tag paradigm-tag--cbm">CBM</span><code class="paradigm-formula">x → c → y</code></div>
+          <p>Scalar concept bottleneck (<code>Detached</code> stops task gradients for zero leakage; <code>Joint</code> co-trains). Interpretable linear weights &amp; strongest causal faithfulness.</p>
+        </div>
+        <div class="paradigm-card">
+          <div class="paradigm-head"><span class="paradigm-tag paradigm-tag--cem">CEM</span><code class="paradigm-formula">x → (c,c⁺,c⁻) → y</code></div>
+          <p>Per-concept positive/negative embeddings mixed by concept probability <code>c</code>. Matches Black-Box accuracy while preserving test-time interventions &amp; calibrated uncertainty.</p>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <span class="preset-label">Ask a CBM Question</span>
+        <div class="question-strip" role="group" aria-label="Jump to core CBM questions">
+          <button class="question-chip" data-jump-act="#signal-section">What does it see?</button>
+          <button class="question-chip" data-jump-act="#pipeline-section">Which concepts matter?</button>
+          <button class="question-chip" data-jump-act="#pipeline-section">Can I fix predictions?</button>
+          <button class="question-chip" data-jump-act="#act-segment">Exact 10 ms boundaries?</button>
+          <button class="question-chip" data-jump-act="#act-segment" data-jump-preset="georgia_artifact" data-jump-epistemic="1">Knows when it's unsure?</button>
+          <button class="question-chip" data-jump-act="#benchmark-section">Leakage &amp; OOD transfer?</button>
+        </div>
+      </div>
+
       <div class="preset-block">
         <span class="preset-label">Guided Clinical Cases</span>
         <div class="preset-strip" role="group" aria-label="Guided clinical case presets">
@@ -55,6 +82,21 @@
           <button class="preset-chip" data-preset="georgia_lbbb">Zero-Shot LBBB (Georgia E10019)</button>
           <button class="preset-chip" data-preset="georgia_iavb">Zero-Shot IAVB (Georgia E00067)</button>
           <button class="preset-chip" data-preset="georgia_artifact">Signal Artifact (Georgia E00006)</button>
+        </div>
+      </div>
+
+      <div class="quick-options-bar" aria-label="Quick comparison and uncertainty options">
+        <div class="quick-opt-group">
+          <span class="preset-label">Model Pair</span>
+          <button class="quick-opt-btn active" data-model-pair="cem_cbm" title="Compare CEM vs masked CBM (both causally intervenable)">CEM vs CBM</button>
+          <button class="quick-opt-btn" data-model-pair="cem_bb" title="Compare intervenable CEM vs opaque Black-Box ResNet">CEM vs Black-Box</button>
+          <button class="quick-opt-btn" data-model-pair="cbm_bb" title="Compare strict scalar CBM vs opaque Black-Box ResNet">CBM vs Black-Box</button>
+        </div>
+        <div class="quick-opt-group">
+          <label class="quick-chk-lbl" title="Toggle MC-Dropout epistemic vs aleatoric uncertainty decomposition across Acts 02–04">
+            <input id="quick-epistemic-chk" type="checkbox" /> Epistemic MC
+          </label>
+          <button id="open-controls-btn" class="secondary-btn small-btn" title="Open dataset, condition filter, all 12 leads, and stride controls">All Controls (Dataset · 12 Leads · Stride) ▾</button>
         </div>
       </div>
 
@@ -129,7 +171,6 @@
             </select>
 
             <label for="stride-input" class="ml">Stride</label>
-            <input id="stride-input" type="number" value="20" min="5" max="200" step="5" style="width:68px" />
             <input id="stride-input" type="number" value="25" min="5" max="200" step="5" style="width:68px" />
             <button id="sweep-btn" class="secondary-btn">Sweep</button>
 
@@ -138,6 +179,7 @@
               <input id="epistemic-chk" type="checkbox" /> Epistemic MC
             </label>
           </div>
+          <div id="explorer-mode-note" class="extensibility-note"></div>
         </div>
       </details>
     </section>
@@ -273,7 +315,16 @@
         <div class="pipe-panel pipe-panel--task">
           <div class="pipe-panel-title">Heartbeat Completeness</div>
           <div id="task-pred-container"></div>
+          <div id="task-unc-breakdown" class="unc-breakdown"></div>
         </div>
+      </div>
+
+      <div id="concept-weights-panel" class="weights-panel">
+        <div class="weights-header">
+          <span class="pipe-panel-title" style="margin-bottom:0">Global Concept-to-Task Weights (How Concepts Drive Prediction)</span>
+          <span id="concept-weights-note" class="meta-label"></span>
+        </div>
+        <div id="concept-weights-bars" class="weights-bars"></div>
       </div>
     </section>
 
@@ -365,6 +416,7 @@
           <option value="">None</option>
         </select>
       </div>
+      <div id="dense-model-note" class="meta-label" style="margin:-0.45rem 0 0.65rem"></div>
 
       <div class="dense-panel">
         <div class="pipe-panel-title">Wave-Mask Interventions (Auto → Ablate 0 → Force 1) &amp; 5-Class Pathology
@@ -473,6 +525,20 @@
         <div id="metrics-summary-container" class="metrics-col"></div>
         <div id="intervention-curve-container" class="curve-col"></div>
       </div>
+
+      <details id="concept-breakdown-details" class="controls-drawer" style="margin-top:0.9rem">
+        <summary class="controls-summary">
+          <span class="controls-summary-left">
+            <span class="controls-pill">Deep Dive</span>
+            <span>Per-Concept F1 (10 concepts), Per-Wave Dice &amp; Bottleneck Leakage Probes</span>
+          </span>
+          <span class="controls-summary-right">Expand breakdown ▾</span>
+        </summary>
+        <div class="breakdown-grid">
+          <div id="per-concept-table"></div>
+          <div id="dense-leakage-table"></div>
+        </div>
+      </details>
 
       <div class="takeaway-grid">
         <div class="takeaway-card">

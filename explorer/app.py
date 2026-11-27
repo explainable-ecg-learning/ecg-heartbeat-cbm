@@ -436,17 +436,43 @@ _GEORGIA_META: Optional[pd.DataFrame] = None
 _GEORGIA_LOCK = threading.Lock()
 _PRECALC_MANIFEST: Optional[dict] = None
 _PRECALC_MANIFEST_PATH: Optional[Path] = None
+_PRECALC_MANIFEST_MTIME: Optional[int] = None
 _PRECALC_LOCK = threading.Lock()
 
 
 def _get_precalc_manifest() -> Optional[dict]:
-    global _PRECALC_MANIFEST, _PRECALC_MANIFEST_PATH
+    global _PRECALC_MANIFEST, _PRECALC_MANIFEST_PATH, _PRECALC_MANIFEST_MTIME
     mpath = PRECALC_DIR / "manifest.json"
+    mtime = mpath.stat().st_mtime_ns if mpath.exists() else None
     with _PRECALC_LOCK:
-        if _PRECALC_MANIFEST is None or _PRECALC_MANIFEST_PATH != mpath:
+        if (
+            _PRECALC_MANIFEST is None
+            or _PRECALC_MANIFEST_PATH != mpath
+            or _PRECALC_MANIFEST_MTIME != mtime
+        ):
             _PRECALC_MANIFEST = _read_json_if_exists(mpath)
             _PRECALC_MANIFEST_PATH = mpath
+            _PRECALC_MANIFEST_MTIME = mtime
+            _load_precalc_record_cached.cache_clear()
         return _PRECALC_MANIFEST
+
+
+def _get_custom_precalc_datasets() -> Dict[str, dict]:
+    """Return custom pre-calculated datasets (e.g. converted from NumPy) registered in manifest.json."""
+    manifest = _get_precalc_manifest() or {}
+    recs_by_ds = manifest.get("records_by_dataset") or {}
+    out: Dict[str, dict] = {}
+    for d in manifest.get("datasets") or []:
+        if not isinstance(d, dict):
+            continue
+        did = str(d.get("id") or "").strip().lower()
+        if did and did not in ("ptbxl", "georgia") and recs_by_ds.get(did):
+            out[did] = d
+    return out
+
+
+def _is_precalc_only_dataset(ds_name: str) -> bool:
+    return (ds_name == "georgia" and not _has_georgia_raw()) or (ds_name in _get_custom_precalc_datasets())
 
 
 def _unpack_precalc_record(raw: dict) -> dict:
@@ -828,7 +854,11 @@ def _normalize_dataset(dataset: Optional[str]) -> str:
         if not _has_georgia():
             raise HTTPException(status_code=503, detail=f"Georgia dataset not available under {GEORGIA_ROOT}")
         return "georgia"
-    raise HTTPException(status_code=400, detail=f"Unknown dataset '{dataset}'. Expected 'ptbxl' or 'georgia'.")
+    custom_ds = _get_custom_precalc_datasets()
+    if ds in custom_ds:
+        return ds
+    avail = ["ptbxl"] + (["georgia"] if _has_georgia() else []) + list(custom_ds.keys())
+    raise HTTPException(status_code=400, detail=f"Unknown dataset '{dataset}'. Available: {avail}.")
 
 
 def _parse_ptbxl_id(ecg_id: Union[int, str]) -> int:
@@ -1081,6 +1111,8 @@ def list_datasets():
             ],
             "conditions": ["ALL", "NORM", "STTC", "CD", "HYP", "MI", "AFIB", "BBB", "IAVB", "LQT", "PVC"],
         })
+    for custom_ds in _get_custom_precalc_datasets().values():
+        datasets.append(custom_ds)
     return {"default_dataset": "ptbxl", "datasets": datasets}
 
 
@@ -1094,6 +1126,59 @@ def get_external_benchmark():
     return {"available": True, **data}
 
 
+def _list_precalc_records(
+    ds: str,
+    limit: int,
+    fold: Optional[str],
+    dx: Optional[str],
+    search: Optional[str],
+) -> dict:
+    manifest = _get_precalc_manifest() or {}
+    all_recs = list((manifest.get("records_by_dataset") or {}).get(ds, []))
+    ds_meta = next((d for d in (manifest.get("datasets") or []) if d.get("id") == ds), {})
+    valid_splits = {str(s.get("value")) for s in (ds_meta.get("splits") or [])}
+
+    subset_recs = all_recs
+    if fold is None or (fold == "10" and "10" not in valid_splits):
+        fval = str(ds_meta.get("default_split") or ("0_clean" if ds == "georgia" else "all")).strip()
+    else:
+        fval = str(fold).strip()
+
+    if fval.lower() not in ("all", ""):
+        if ds == "georgia" and fval == "10":
+            fval = "0_clean"
+        subset_recs = [
+            r for r in subset_recs
+            if str(r.get("split") if r.get("split") is not None else (r.get("severity_tier") if ds == "georgia" else r.get("fold", ""))) == fval
+        ]
+    if dx and dx.upper() != "ALL":
+        tag = dx.upper()
+        subset_recs = [r for r in subset_recs if tag in (r.get("tags") or [])]
+    q = (search or "").strip().lower()
+    if q:
+        subset_recs = [
+            r for r in subset_recs
+            if q in str(r.get("ecg_id", "")).lower()
+            or q in " ".join(r.get("label_names") or []).lower()
+            or q in " ".join(r.get("dx") or []).lower()
+        ]
+    total = len(subset_recs)
+    head_recs = subset_recs[:limit]
+    if ds == "georgia" and not q and (not dx or dx.upper() == "ALL") and fval in ("0_clean", "all", ""):
+        by_id = {str(r["ecg_id"]): r for r in subset_recs}
+        pinned = [by_id[rid] for rid in GEORGIA_SHOWCASE_IDS if rid in by_id]
+        if pinned:
+            pin_ids = {str(r["ecg_id"]) for r in pinned}
+            rest = [r for r in head_recs if str(r["ecg_id"]) not in pin_ids][: max(0, limit - len(pinned))]
+            head_recs = pinned + rest
+    return {
+        "dataset":    ds,
+        "record_ids": [str(r["ecg_id"]) for r in head_recs],
+        "records":    head_recs,
+        "total":      total,
+    }
+
+
 @app.get("/records")
 def list_records(
     limit: int = 300,
@@ -1103,41 +1188,9 @@ def list_records(
     dataset: str = "ptbxl",
 ):
     ds = _normalize_dataset(dataset)
+    if _is_precalc_only_dataset(ds):
+        return _list_precalc_records(ds, limit, fold, dx, search)
     if ds == "georgia":
-        if not _has_georgia_raw():
-            manifest = _get_precalc_manifest()
-            all_recs = list((manifest or {}).get("records_by_dataset", {}).get("georgia", []))
-            subset_recs = all_recs
-            fval = (fold or "0_clean").strip()
-            if fval.lower() not in ("all", ""):
-                if fval == "10":
-                    fval = "0_clean"
-                subset_recs = [r for r in subset_recs if str(r.get("severity_tier", "")) == fval]
-            if dx and dx.upper() != "ALL":
-                tag = dx.upper()
-                subset_recs = [r for r in subset_recs if tag in (r.get("tags") or [])]
-            q = (search or "").strip().lower()
-            if q:
-                subset_recs = [
-                    r for r in subset_recs
-                    if q in str(r.get("ecg_id", "")).lower()
-                    or q in " ".join(r.get("label_names") or []).lower()
-                ]
-            total = len(subset_recs)
-            head_recs = subset_recs[:limit]
-            if not q and (not dx or dx.upper() == "ALL") and fval in ("0_clean", "all", ""):
-                by_id = {str(r["ecg_id"]): r for r in subset_recs}
-                pinned = [by_id[rid] for rid in GEORGIA_SHOWCASE_IDS if rid in by_id]
-                if pinned:
-                    pin_ids = {str(r["ecg_id"]) for r in pinned}
-                    rest = [r for r in head_recs if str(r["ecg_id"]) not in pin_ids][: max(0, limit - len(pinned))]
-                    head_recs = pinned + rest
-            return {
-                "dataset":    "georgia",
-                "record_ids": [str(r["ecg_id"]) for r in head_recs],
-                "records":    head_recs,
-                "total":      total,
-            }
         meta = _get_georgia_meta()
         subset = meta
         fval = (fold or "0_clean").strip()
@@ -1229,12 +1282,12 @@ def list_records(
 @app.get("/record/{ecg_id}")
 def get_record(ecg_id: str, model_id: Optional[str] = None, dataset: str = "ptbxl"):
     ds_name = _normalize_dataset(dataset)
-    if ds_name == "georgia" and not _has_georgia_raw():
-        precalc = _load_precalc_record("georgia", str(ecg_id))
+    if _is_precalc_only_dataset(ds_name):
+        precalc = _load_precalc_record(ds_name, str(ecg_id))
         if precalc is None or not precalc.get("record"):
             raise HTTPException(
                 status_code=404,
-                detail=f"Georgia record '{ecg_id}' not found in pre-calculated cache and raw Georgia is not mounted",
+                detail=f"Record '{ecg_id}' in dataset '{ds_name}' not found in pre-calculated cache",
             )
         return copy.deepcopy(precalc["record"])
 
@@ -1341,17 +1394,17 @@ def get_record(ecg_id: str, model_id: Optional[str] = None, dataset: str = "ptbx
 @app.post("/infer")
 def infer(req: InferRequest):
     ds_name = _normalize_dataset(req.dataset)
-    if ds_name == "georgia" and not _has_georgia_raw():
+    if _is_precalc_only_dataset(ds_name):
         resolved_id = _resolve_model_id(req.model_id)
         cmp_id = _resolve_model_id(req.compare_model_id) if req.compare_model_id else None
-        precalc = _load_precalc_record("georgia", str(req.ecg_id))
+        precalc = _load_precalc_record(ds_name, str(req.ecg_id))
         manifest = _get_precalc_manifest() or {}
         sweeps = (precalc or {}).get("sweeps") or {}
         heads = manifest.get("window_heads") or {}
         if resolved_id not in sweeps:
             raise HTTPException(
                 status_code=503,
-                detail=f"Georgia raw data not mounted and '{req.ecg_id}/{resolved_id}' not in pre-calculated cache",
+                detail=f"Raw data not mounted for '{ds_name}' and '{req.ecg_id}/{resolved_id}' not in pre-calculated cache",
             )
         sw = sweeps[resolved_id]
         starts = sw["starts"]
@@ -1361,7 +1414,7 @@ def infer(req: InferRequest):
         gt_task = precalc["sweep_gt_task"][ni] if precalc.get("sweep_gt_task") else None
         payload = {
             "ecg_id":        req.ecg_id,
-            "dataset":       "georgia",
+            "dataset":       ds_name,
             "model_id":      resolved_id,
             "model_type":    sw["model_type"],
             **prim,
@@ -1495,10 +1548,10 @@ def sweep(req: SweepRequest):
                 ),
             }
 
-    if ds_name == "georgia" and not _has_georgia_raw():
+    if _is_precalc_only_dataset(ds_name):
         raise HTTPException(
             status_code=503,
-            detail=f"Georgia raw data not mounted and '{req.ecg_id}' (stride={stride}) not in pre-calculated cache",
+            detail=f"Raw data not mounted for '{ds_name}' and '{req.ecg_id}' (stride={stride}) not in pre-calculated cache",
         )
 
     _, model, cfg = get_model_and_cfg(resolved_id)
@@ -1670,7 +1723,7 @@ def dense_infer(req: DenseInferRequest):
                 and (mode == "gt" or (isinstance(req.intervene_concepts, list) and len(req.intervene_concepts) == 1))
             )
         )
-        precalc_only_fallback = (ds_name == "georgia" and not _has_georgia_raw())
+        precalc_only_fallback = _is_precalc_only_dataset(ds_name)
         if have_models and (single_concept_full or precalc_only_fallback):
             prim = _build_precalc_dense_entry(
                 precalc, req_mid, req.include_epistemic, req.intervene_mode, req.intervene_concepts, req.intervene_span
@@ -1698,10 +1751,10 @@ def dense_infer(req: DenseInferRequest):
                     payload["blackbox"] = bb_e
             return payload
 
-    if ds_name == "georgia" and not _has_georgia_raw():
+    if _is_precalc_only_dataset(ds_name):
         raise HTTPException(
             status_code=503,
-            detail=f"Georgia raw data not mounted and '{req.ecg_id}' dense inference not fully covered by pre-calculated cache",
+            detail=f"Raw data not mounted for '{ds_name}' and '{req.ecg_id}' dense inference not fully covered by pre-calculated cache",
         )
 
     resolved_id, model, cfg = get_dense_model_and_cfg(req.model_id)
@@ -1892,7 +1945,7 @@ def health():
         "device":        DEVICE,
         "runs_dir":      str(RUNS_DIR),
         "data_path":     str(DATA_PATH),
-        "datasets":      (["ptbxl", "georgia"] if (ga_raw or ga_pre) else ["ptbxl"]),
+        "datasets":      (["ptbxl"] + (["georgia"] if (ga_raw or ga_pre) else []) + list(_get_custom_precalc_datasets().keys())),
         "georgia_mode":  ga_mode,
         "n_models":      len(runs),
         "default_model": DEFAULT_RUN_KEY,

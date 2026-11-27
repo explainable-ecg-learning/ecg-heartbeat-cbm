@@ -810,6 +810,218 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
   line-height: 1.48;
 }
 
+/* ── Paradigm Overview, CBM Question Navigator & Quick Options ────────────── */
+.paradigm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+@media (max-width: 820px) { .paradigm-grid { grid-template-columns: 1fr; } }
+.paradigm-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  padding: 0.52rem 0.68rem;
+}
+.paradigm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.24rem;
+}
+.paradigm-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+.paradigm-tag--cbm { color: #2b5b84; }
+.paradigm-tag--cem { color: var(--accent); }
+.paradigm-formula {
+  font-size: 0.71rem;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  padding: 0.04rem 0.32rem;
+  border-radius: 0.2rem;
+}
+.paradigm-card p {
+  font-size: 0.77rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.question-block {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.7rem;
+  margin-top: 0.7rem;
+}
+.question-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.question-chip {
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--rule);
+  background: var(--bg-subtle);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.question-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(184, 59, 42, 0.05);
+}
+
+.quick-options-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.9rem;
+  margin-top: 0.65rem;
+  padding: 0.42rem 0.68rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+}
+.quick-opt-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.quick-opt-btn {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.16rem 0.52rem;
+  border-radius: 0.22rem;
+  border: 1px solid var(--rule-strong);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.quick-opt-btn:hover { border-color: var(--ink); color: var(--ink); }
+.quick-opt-btn.active {
+  border-color: var(--accent);
+  background: rgba(184, 59, 42, 0.09);
+  color: var(--accent);
+}
+.quick-chk-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.extensibility-note {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.extensibility-note code {
+  font-size: 0.73rem;
+  color: var(--ink);
+  background: var(--bg-active);
+  padding: 0.05rem 0.28rem;
+  border-radius: 0.2rem;
+}
+
+/* ── Global Weights Bar Panel & Epistemic / Baseline Breakdown ────────────── */
+.weights-panel {
+  margin-top: 0.75rem;
+  padding: 0.58rem 0.75rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+}
+.weights-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin-bottom: 0.45rem;
+}
+.weights-bars {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.4rem 0.75rem;
+}
+@media (max-width: 780px) { .weights-bars { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.weight-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.16rem;
+}
+.weight-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.73rem;
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+.weight-top.masked { color: var(--muted); }
+.weight-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+.weight-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.unc-breakdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  text-align: center;
+}
+.delta-badge {
+  display: inline-block;
+  padding: 0.06rem 0.4rem;
+  border-radius: 0.2rem;
+  font-weight: 600;
+  font-size: 0.73rem;
+}
+.delta-badge.pos { background: rgba(45, 122, 86, 0.12); color: var(--ok); }
+.delta-badge.neg { background: rgba(184, 59, 42, 0.12); color: var(--accent); }
+.delta-badge.neu { background: var(--bg-active); color: var(--muted); }
+
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  padding: 0.75rem 0.9rem;
+}
+@media (max-width: 820px) { .breakdown-grid { grid-template-columns: 1fr; } }
+
 /* ── Global & Per-Section Loading Signs ──────────────────────────────────── */
 @keyframes ecg-spin {
   to { transform: rotate(360deg); }

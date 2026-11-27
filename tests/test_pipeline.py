@@ -516,6 +516,117 @@ class TestECGModelsAndPipeline(unittest.TestCase):
         finally:
             exp_app.GEORGIA_ROOT = orig_root
 
+    def test_numpy_converter_and_custom_dataset_explorer(self) -> None:
+        import json
+        import shutil
+        import tempfile
+
+        exp_dir = REPO_ROOT / "explorer"
+        if str(exp_dir) not in sys.path:
+            sys.path.insert(0, str(exp_dir))
+        import app as exp_app  # noqa: E402
+        import convert_numpy as cnp  # noqa: E402
+
+        rng = np.random.default_rng(7)
+        t_500 = np.linspace(0.0, 10.0, 5000, endpoint=False, dtype=np.float32)
+        beat_500 = 0.08 * np.sin(2 * np.pi * 1.2 * t_500) + 0.01 * rng.standard_normal(5000).astype(np.float32)
+        arr_3d = np.broadcast_to(beat_500[None, :, None], (2, 5000, 12)).copy()
+
+        t_250 = np.linspace(0.0, 10.0, 2500, endpoint=False, dtype=np.float32)
+        arr_2d_250 = np.broadcast_to(np.sin(2 * np.pi * 1.1 * t_250)[None, :], (12, 2500)).copy()
+        arr_1d = beat_500.copy()
+
+        tmpdir = Path(tempfile.mkdtemp(prefix="ecg_numpy_conv_"))
+        orig_precalc = exp_app.PRECALC_DIR
+        try:
+            npy_3d = tmpdir / "batch.npy"
+            np.save(npy_3d, arr_3d)
+            meta_csv = tmpdir / "meta.csv"
+            meta_csv.write_text("ecg_id,dx,age,sex,split\ncase_a,NORM,52,M,cohort1\ncase_b,MI,64,F,cohort2\n")
+
+            res1 = cnp.convert_numpy_to_explorer(
+                npy_3d,
+                dataset_id="my_numpy",
+                dataset_label="My NumPy Cohort",
+                out_dir=tmpdir / "out",
+                fs=500,
+                channel_axis="auto",
+                meta_path=meta_csv,
+                run_mc=False,
+                device="cpu",
+            )
+            self.assertEqual(res1["n_converted"], 2)
+            self.assertEqual(res1["record_ids"], ["case_a", "case_b"])
+
+            npz_2d = tmpdir / "sub.npz"
+            np.savez(npz_2d, signal=arr_2d_250)
+            res2 = cnp.convert_numpy_to_explorer(
+                npz_2d,
+                dataset_id="my_numpy",
+                out_dir=tmpdir / "out",
+                fs=250,
+                append=True,
+                run_mc=False,
+                device="cpu",
+            )
+            self.assertEqual(res2["n_converted"], 1)
+
+            npy_1d = tmpdir / "lead2.npy"
+            np.save(npy_1d, arr_1d)
+            res3 = cnp.convert_numpy_to_explorer(
+                npy_1d,
+                dataset_id="my_numpy",
+                out_dir=tmpdir / "out",
+                fs=500,
+                single_lead="II",
+                append=True,
+                run_mc=False,
+                device="cpu",
+            )
+            self.assertEqual(res3["n_converted"], 1)
+
+            exp_json = json.loads((tmpdir / "out" / "records" / "my_numpy_case_a.json").read_text())
+            self.assertEqual(exp_json["record"]["downsample"], 4)
+            self.assertEqual(exp_json["record"]["n_samples_ds"], 1250)
+            self.assertIn("cem_softseg", exp_json["sweeps"])
+            self.assertIn("dense_cem_s42", exp_json["dense"])
+            self.assertEqual(len(exp_json["dense"]["dense_cem_s42"]["interventions_win"]["ablate:QRS"]), 10)
+
+            exp_app.PRECALC_DIR = tmpdir / "out"
+            ds_ids = [d["id"] for d in exp_app.list_datasets()["datasets"]]
+            self.assertIn("my_numpy", ds_ids)
+            self.assertIn("my_numpy", exp_app.health()["datasets"])
+
+            lst = exp_app.list_records(dataset="my_numpy", fold="cohort1")
+            self.assertEqual(lst["record_ids"], ["case_a"])
+            rec = exp_app.get_record("case_a", dataset="my_numpy")
+            self.assertEqual(rec["dataset"], "my_numpy")
+            self.assertEqual(len(rec["signal"]), 12)
+
+            sw = exp_app.sweep(exp_app.SweepRequest(ecg_id="case_a", dataset="my_numpy", stride=25))
+            self.assertEqual(sw["dataset"], "my_numpy")
+            inf = exp_app.infer(
+                exp_app.InferRequest(
+                    ecg_id="case_a", dataset="my_numpy", start=1000,
+                    model_id="cem_softseg", interventions={0: 1.0},
+                )
+            )
+            self.assertEqual(inf["dataset"], "my_numpy")
+            dres = exp_app.dense_infer(
+                exp_app.DenseInferRequest(
+                    ecg_id="case_a", dataset="my_numpy", model_id="dense_cem_s42",
+                    intervene_mode="ablate", intervene_concepts=["QRS"],
+                )
+            )
+            self.assertEqual(dres["dataset"], "my_numpy")
+
+            removed = cnp.remove_dataset_from_explorer("my_numpy", tmpdir / "out")
+            self.assertEqual(removed, 4)
+            self.assertNotIn("my_numpy", [d["id"] for d in exp_app.list_datasets()["datasets"]])
+        finally:
+            exp_app.PRECALC_DIR = orig_precalc
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
