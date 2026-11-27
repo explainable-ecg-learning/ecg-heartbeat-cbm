@@ -461,6 +461,61 @@ class TestECGModelsAndPipeline(unittest.TestCase):
                 exp_prob = 1.0 / (1.0 + float(np.exp(-np.clip(logit, -30.0, 30.0))))
                 self.assertAlmostEqual(float(pt_out[bi, 0].item()), exp_prob, delta=5e-3)
 
+    def test_explorer_precalc_fastpath_and_georgia_fallback(self) -> None:
+        exp_dir = REPO_ROOT / "explorer"
+        if str(exp_dir) not in sys.path:
+            sys.path.insert(0, str(exp_dir))
+        import app as exp_app  # noqa: E402
+
+        pre_dir = REPO_ROOT / "explorer" / "vercel" / "data"
+        self.assertTrue((pre_dir / "manifest.json").exists())
+
+        # Verify pre-calculated fast path works on curated PTB-XL & Georgia records
+        sw_ga = exp_app.sweep(exp_app.SweepRequest(ecg_id="E10019", dataset="georgia", stride=25))
+        self.assertEqual(sw_ga["dataset"], "georgia")
+        self.assertEqual(sw_ga["stride"], 25)
+        self.assertIn("seg_spans", exp_app.dense_infer(
+            exp_app.DenseInferRequest(ecg_id="9", dataset="ptbxl", model_id="dense_cem_s42")
+        ))
+
+        # Verify full Georgia fallback when raw ECG_GEORGIA_DIR is absent
+        orig_root = exp_app.GEORGIA_ROOT
+        try:
+            exp_app.GEORGIA_ROOT = REPO_ROOT / "_nonexistent_georgia_dir"
+            self.assertFalse(exp_app._has_georgia_raw())
+            self.assertTrue(exp_app._has_georgia_precalc())
+            self.assertIn("georgia", [d["id"] for d in exp_app.list_datasets()["datasets"]])
+            self.assertEqual(exp_app.health()["georgia_mode"], "precalc")
+
+            recs = exp_app.list_records(dataset="georgia", fold="0_clean")
+            self.assertGreaterEqual(len(recs["record_ids"]), 3)
+            rec = exp_app.get_record("E00021", dataset="georgia")
+            self.assertEqual(rec["dataset"], "georgia")
+            self.assertEqual(len(rec["signal"]), 12)
+
+            inf = exp_app.infer(
+                exp_app.InferRequest(
+                    ecg_id="E00021", dataset="georgia", start=1000,
+                    model_id="cem_softseg", compare_model_id="cbm_softseg_masked",
+                    interventions={0: 1.0}, include_epistemic=True,
+                )
+            )
+            self.assertEqual(inf["dataset"], "georgia")
+            self.assertIn("compare", inf)
+
+            dres = exp_app.dense_infer(
+                exp_app.DenseInferRequest(
+                    ecg_id="E10019", dataset="georgia", model_id="dense_cem_s42",
+                    compare_model_id="dense_cbm_detached_s42", blackbox_model_id="dense_blackbox_s42",
+                    include_epistemic=True, intervene_mode="ablate", intervene_concepts=["QRS"],
+                )
+            )
+            self.assertEqual(dres["dataset"], "georgia")
+            self.assertIn("pathology", dres)
+            self.assertTrue(exp_app.get_external_benchmark()["available"])
+        finally:
+            exp_app.GEORGIA_ROOT = orig_root
+
 
 if __name__ == "__main__":
     unittest.main()

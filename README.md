@@ -190,7 +190,7 @@ docker compose up --build
 cd explorer
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 
-# Or preview/deploy zero-cold-start static Vercel bundle (explorer/vercel/, ~7.7 MB)
+# Or preview/deploy zero-cold-start static Vercel bundle (explorer/vercel/, 30 curated ECGs)
 CUDA_VISIBLE_DEVICES=0 python explorer/build_vercel.py
 python3 -m http.server 8041 --directory explorer/vercel
 ```
@@ -244,7 +244,7 @@ explorer/
   index.html             — Minimal editorial D3 v7 UI
   static/                — Frontend JS (live + static Vercel adapter), CSS, and vendored D3 v7
   build_vercel.py        — Static CDN + exact linear head exporter for zero-cold-start Vercel hosting
-  vercel/                — Deployable Vercel root directory (vercel.json, static UI + 12 curated ECG bundles)
+  vercel/                — Deployable Vercel root directory (vercel.json, static UI + 30 curated ECG bundles)
   run.sh                 — Local Uvicorn launch script (defaults to 127.0.0.1:8040)
   Dockerfile             — Self-contained Explorer container image (BuildKit context: repo root)
   Dockerfile.dockerignore

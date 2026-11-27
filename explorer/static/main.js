@@ -563,7 +563,7 @@ const state = {
   ecgSegOverlay:  "dense_cem",
 };
 
-let signalG, windowRect, windowHandleL, windowHandleR;
+let signalG;
 let _xScaleSig = null;
 let _winWpx = 0;
 
@@ -1153,44 +1153,17 @@ function renderSignal() {
   drawPeakDots(delin.p_peaks, "#2b5b84");
   drawPeakDots(delin.t_peaks, "#2d7a56");
 
-  // Draggable 1.0s Window & Midpoint Cursor
-  const startFromX = px => Math.max(0, Math.min(T - tFixed, Math.round(_xScaleSig.invert(px))));
-
-  windowRect = signalG.append("rect")
-    .attr("class", "window-rect").attr("y", 0).attr("height", H).attr("width", _winWpx);
-  windowHandleL = signalG.append("rect")
-    .attr("class", "window-handle").attr("width", 7).attr("height", 20).attr("y", H / 2 - 10);
-  windowHandleR = signalG.append("rect")
-    .attr("class", "window-handle").attr("width", 7).attr("height", 20).attr("y", H / 2 - 10);
-
-  window._sigMidCursorScale = _xScaleSig;
-  window._sigMidCursor = signalG.append("line")
-    .attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
-
+  // Draggable 1.0s Window Box, L/R Handles & Midpoint Cursor
+  attachSyncedWindowOverlay("signal", signalG, _xScaleSig, H);
   updateWindowPosition(state.windowStart);
 
-  const onDragMove = newStart => {
-    updateWindowPosition(newStart);
-    renderWindowPlot();
-    if (state.sweepData && Object.keys(state.interventions).length === 0) {
-      updatePipelineFromSweep();
-    }
-  };
-
-  windowRect.call(d3.drag()
-    .on("drag", e => onDragMove(startFromX(e.x - _winWpx / 2)))
-    .on("end",  () => updatePipeline()));
-  windowHandleL.call(d3.drag()
-    .on("drag", e => onDragMove(startFromX(e.x)))
-    .on("end",  () => updatePipeline()));
-  windowHandleR.call(d3.drag()
-    .on("drag", e => onDragMove(startFromX(e.x - _winWpx)))
-    .on("end",  () => updatePipeline()));
-
-  svg.on("click", async e => {
+  const halfWin = tFixed / 2;
+  svg.style("cursor", "pointer").on("click", async e => {
+    if (e.defaultPrevented) return;
     const [mx] = d3.pointer(e, signalG.node());
     if (mx < 0 || mx > W) return;
-    updateWindowPosition(startFromX(mx - _winWpx / 2));
+    const start = Math.max(0, Math.min(T - tFixed, Math.round(_xScaleSig.invert(mx) - halfWin)));
+    updateWindowPosition(start);
     await updatePipeline();
   });
 }
@@ -1295,24 +1268,17 @@ function renderSegmentedSignal() {
     flushRun(nSeg);
   }
 
-  // Non-interactive 1.0s selected window span + ECG trace + midpoint cursor
-  window._segSignalWinRect = g.append("rect")
-    .attr("y", 0).attr("height", H).attr("width", winWpx)
-    .attr("fill", "rgba(184, 59, 42, 0.08)")
-    .style("pointer-events", "none");
-
+  // ECG trace + Synced Draggable 1.0s Window Overlay
   const lineGen = d3.line()
     .x((_, i) => xScale(i * ds))
     .y(d => yScale(d));
   g.append("path").datum(raw).attr("class", "ecg-line").attr("d", lineGen);
 
-  window._segSignalCursorScale = xScale;
-  window._segSignalCursor = g.append("line")
-    .attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
-  updateSyncCursors(state.windowStart);
+  attachSyncedWindowOverlay("seg_signal", g, xScale, H);
 
   const halfWin = tFixed / 2;
   svg.style("cursor", "pointer").on("click", async e => {
+    if (e.defaultPrevented) return;
     const [mx] = d3.pointer(e, g.node());
     if (mx < 0 || mx > W) return;
     const start = Math.max(0, Math.min(T - tFixed, Math.round(xScale.invert(mx) - halfWin)));
@@ -1864,12 +1830,9 @@ function renderUnifiedSegmentationView() {
     }
   });
 
-  const cursor = g.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
-  window._denseCursorScale = xScale;
-  window._denseCursor      = cursor;
-  updateSyncCursors(state.windowStart);
+  attachSyncedWindowOverlay("dense_seg", g, xScale, H);
 
-  // Interactive hover readout + click/drag to move ECG window
+  // Interactive hover readout + click to move ECG window
   const hoverLine = g.append("line").attr("y1", 0).attr("y2", H)
     .attr("stroke", "#767676").attr("stroke-width", 1).attr("stroke-dasharray", "2,2").style("display", "none");
   const readout = document.getElementById("seg-hover-readout");
@@ -1886,7 +1849,8 @@ function renderUnifiedSegmentationView() {
   }).on("mouseleave", () => { hoverLine.style("display", "none"); });
 
   const halfWin = state.tFixed / 2;
-  svg.on("click", async e => {
+  svg.style("cursor", "pointer").on("click", async e => {
+    if (e.defaultPrevented) return;
     const [mx] = d3.pointer(e, g.node());
     if (mx < 0 || mx > W) return;
     const start = Math.max(0, Math.min(T - state.tFixed, Math.round(xScale.invert(mx) - halfWin)));
@@ -1927,11 +1891,17 @@ function renderUnifiedSegmentationView() {
     }
     ug.append("text").attr("x", 4).attr("y", 10).attr("fill", "#767676").attr("font-size", 8.5)
       .text("Per-Timestamp Boundary Uncertainty σ(t) — Terracotta: DenseCEM · Slate dashed: DenseCBM");
-    const uCur = ug.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", UH);
-    window._uncCursor = uCur;
-    window._uncCursorScale = xScale;
-    updateSyncCursors(state.windowStart);
+    attachSyncedWindowOverlay("unc", ug, xScale, UH);
+    uSvg.style("cursor", "pointer").on("click", async e => {
+      if (e.defaultPrevented) return;
+      const [mx] = d3.pointer(e, ug.node());
+      if (mx < 0 || mx > W) return;
+      const start = Math.max(0, Math.min(T - state.tFixed, Math.round(xScale.invert(mx) - halfWin)));
+      updateWindowPosition(start);
+      await updatePipeline();
+    });
   } else {
+    _syncedWindowOverlays.delete("unc");
     uncBox.style.display = "none";
   }
 }
@@ -2017,23 +1987,17 @@ function renderActivationLineplot(data) {
     drawSet(data.compare.task_probs, data.compare.concept_probs, true, 1.4, 0.78);
   }
 
-  // Synced vertical cursor
-  const cursor = g.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", H);
-  window._lineCursorScale = xScale;
-  window._lineCursor      = cursor;
-  updateSyncCursors(state.windowStart);
+  // Synced 1.0s Window Box, L/R Handles & Midpoint Cursor
+  attachSyncedWindowOverlay("lineplot", g, xScale, H);
 
-  // Click / drag on lineplot to move ECG window
-  const moveFromX = mx => {
-    const centreSample = xScale.invert(mx);
-    const start = Math.max(0, Math.min(T - data.t_fixed, Math.round(centreSample - halfWin)));
+  svg.style("cursor", "pointer").on("click", async e => {
+    if (e.defaultPrevented) return;
+    const [mx] = d3.pointer(e, g.node());
+    if (mx < 0 || mx > W) return;
+    const start = Math.max(0, Math.min(T - data.t_fixed, Math.round(xScale.invert(mx) - halfWin)));
     updateWindowPosition(start);
-    renderWindowPlot();
-    if (Object.keys(state.interventions).length === 0) updatePipelineFromSweep();
-  };
-  svg.call(d3.drag()
-    .on("start drag", e => moveFromX(e.x - ml))
-    .on("end", () => updatePipeline()));
+    await updatePipeline();
+  });
 
   // Update legend
   const styleNote = data.compare
@@ -2128,16 +2092,14 @@ function renderHeatmap(data) {
     .attr("fill", "transparent")
     .style("cursor", "pointer")
     .on("click", async e => {
+      if (e.defaultPrevented) return;
       const [mx] = d3.pointer(e, g.node());
       const ni = Math.max(0, Math.min(N - 1, Math.floor(mx / CELL_W)));
       updateWindowPosition(starts[ni]);
       await updatePipeline();
     });
 
-  const cursor = g.append("line").attr("class", "sync-cursor").attr("y1", 0).attr("y2", MAP_H);
-  window._heatmapCursorScale = xScale;
-  window._heatmapCursor      = cursor;
-  updateSyncCursors(state.windowStart);
+  attachSyncedWindowOverlay("heatmap", g, xScale, MAP_H);
   document.getElementById("timeline-legend").innerHTML =
     `<span class="meta-label">Heatmap: ${data.model_id} concept probabilities (0 → 1)</span>`;
 }
@@ -2630,46 +2592,61 @@ function renderInterventionCurves() {
   }
 }
 
-// ── Shared Cursor Sync ─────────────────────────────────────────────────────
+// ── Shared Synced 1.0s Window Box, L/R Handles & Midpoint Cursor ────────────
+const _syncedWindowOverlays = new Map();
+
+function attachSyncedWindowOverlay(key, g, xScale, height) {
+  const T = state.nSamples;
+  const tFixed = state.tFixed;
+  const winWpx = xScale(tFixed) - xScale(0);
+  const handleH = Math.min(20, Math.max(12, Math.round(height * 0.28)));
+
+  const rect = g.append("rect")
+    .attr("class", "window-rect").attr("y", 0).attr("height", height).attr("width", winWpx);
+  const handleL = g.append("rect")
+    .attr("class", "window-handle").attr("width", 7).attr("height", handleH).attr("y", (height - handleH) / 2);
+  const handleR = g.append("rect")
+    .attr("class", "window-handle").attr("width", 7).attr("height", handleH).attr("y", (height - handleH) / 2);
+  const cursor = g.append("line")
+    .attr("class", "sync-cursor").attr("y1", 0).attr("y2", height);
+
+  const startFromX = px => Math.max(0, Math.min(T - tFixed, Math.round(xScale.invert(px))));
+  const onDragMove = newStart => {
+    updateWindowPosition(newStart);
+    renderWindowPlot();
+    if (state.sweepData && Object.keys(state.interventions).length === 0) {
+      updatePipelineFromSweep();
+    }
+  };
+
+  rect.call(d3.drag()
+    .on("drag", e => onDragMove(startFromX(e.x - winWpx / 2)))
+    .on("end",  () => updatePipeline()));
+  handleL.call(d3.drag()
+    .on("drag", e => onDragMove(startFromX(e.x)))
+    .on("end",  () => updatePipeline()));
+  handleR.call(d3.drag()
+    .on("drag", e => onDragMove(startFromX(e.x - winWpx)))
+    .on("end",  () => updatePipeline()));
+
+  _syncedWindowOverlays.set(key, { rect, handleL, handleR, cursor, xScale, winWpx });
+  updateSyncCursors(state.windowStart);
+}
+
 function updateSyncCursors(windowStart) {
   const centre = windowStart + state.tFixed / 2;
-  if (window._sigMidCursor && window._sigMidCursorScale) {
-    const px = window._sigMidCursorScale(centre);
-    window._sigMidCursor.attr("x1", px).attr("x2", px);
-  }
-  if (window._lineCursor && window._lineCursorScale) {
-    const px = window._lineCursorScale(centre);
-    window._lineCursor.attr("x1", px).attr("x2", px);
-  }
-  if (window._segSignalCursor && window._segSignalCursorScale) {
-    const px = window._segSignalCursorScale(centre);
-    window._segSignalCursor.attr("x1", px).attr("x2", px);
-    if (window._segSignalWinRect) {
-      window._segSignalWinRect.attr("x", window._segSignalCursorScale(windowStart));
-    }
-  }
-  if (window._denseCursor && window._denseCursorScale) {
-    const px = window._denseCursorScale(centre);
-    window._denseCursor.attr("x1", px).attr("x2", px);
-  }
-  if (window._heatmapCursor && window._heatmapCursorScale) {
-    const px = window._heatmapCursorScale(centre);
-    window._heatmapCursor.attr("x1", px).attr("x2", px);
-  }
-  if (window._uncCursor && window._uncCursorScale) {
-    const px = window._uncCursorScale(centre);
-    window._uncCursor.attr("x1", px).attr("x2", px);
-  }
+  _syncedWindowOverlays.forEach(ov => {
+    const px = ov.xScale(windowStart);
+    const cx = ov.xScale(centre);
+    ov.rect.attr("x", px);
+    ov.handleL.attr("x", px - 3.5);
+    ov.handleR.attr("x", px + ov.winWpx - 3.5);
+    ov.cursor.attr("x1", cx).attr("x2", cx);
+  });
 }
 
 function updateWindowPosition(start) {
   state.windowStart = start;
-  if (signalG && _xScaleSig) {
-    const px = _xScaleSig(start);
-    windowRect.attr("x", px);
-    windowHandleL.attr("x", px - 3.5);
-    windowHandleR.attr("x", px + _winWpx - 3.5);
-  }
   const sr = state.samplingRate || 500;
   document.getElementById("window-pos-label").textContent =
     `window: ${(start / sr).toFixed(2)}s – ${((start + state.tFixed) / sr).toFixed(2)}s`;
